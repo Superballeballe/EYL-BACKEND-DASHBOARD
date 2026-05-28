@@ -1,0 +1,122 @@
+// Database row shapes (what Supabase returns). Loose but practical.
+
+export type Knight = {
+  id: string;
+  full_name: string;
+  display_name: string;
+  role: "walker" | "biker" | null;
+  joining_date: string | null;
+  default_location: string | null;
+  active: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KnightSalary = {
+  id: string;
+  knight_id: string;
+  month: string;
+  travel: number | null;
+  salary: number | null;
+  total: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkDay = {
+  work_date: string;
+  is_sunday: boolean;
+  note: string | null;
+  walker_count: number | null;
+  biker_count: number | null;
+  src_sheet: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyAssignment = {
+  id: string;
+  work_date: string;
+  knight_id: string | null;
+  knight_name: string | null;
+  role: "walker" | "biker" | null;
+  location: string | null;
+  shift_time: string | null;
+  status: "working" | "leave" | "half_day";
+  note: string | null;
+  position: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Client = {
+  id: string;
+  client_name: string;
+  company_name: string | null;
+  address: string | null;
+  gst_no: string | null;
+  phone: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RateTier = {
+  id: string;
+  provider: string;
+  label: string | null;
+  min_km: number | null;
+  max_km: number | null;
+  fee: number | null;
+  fee_ex_gst: number | null;
+  gst_amount: number | null;
+  effective_from: string | null;
+  is_current: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Delivery = {
+  id: string;
+  serial_no: number | null;
+  booking_date: string | null;
+  task_date: string | null;
+  mode_of_booking: "b2b" | "online" | null;
+  sender_name: string | null;
+  sender_last_name: string | null;
+  pickup_location: string | null;
+  pickup_time_window: string | null;
+  pickup_actual_time: string | null;
+  drop_location: string | null;
+  drop_recipient_name: string | null;
+  drop_time_window: string | null;
+  drop_actual_time: string | null;
+  knight_id: string | null;
+  knight_name: string | null;
+  assignment_status: "assigned" | "cancelled";
+  fees: number | null;
+  kms: number | null;
+  working_hours: string | null;
+  cod_remark: string | null;
+  cab_auto_fare: string | null;
+  payment_status: "paid" | "unpaid" | "free" | "partial" | null;
+  final_bill_amount: number | null;
+  payment_mode: string | null;
+  payment_received_date: string | null;
+  billing_name: string | null;
+  billing_address: string | null;
+  gst_no: string | null;
+  invoice_no: string | null;
+  invoice_date: string | null;
+  client_id: string | null;
+  content: string | null;
+  remark: string | null;
+  src_sheet: string | null;
+  src_row: number | null;
+  needs_review: boolean;
+  raw: unknown;
+  created_at: string;
+  updated_at: string;
+};

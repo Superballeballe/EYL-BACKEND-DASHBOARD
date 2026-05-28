@@ -1,0 +1,53 @@
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { clientUpdateSchema } from "@/lib/schemas";
+import { notFound, ok, parseBody, serverError } from "@/lib/api";
+
+export const runtime = "nodejs";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_req: Request, { params }: Ctx) {
+  try {
+    const { id } = await params;
+    const { data, error } = await supabaseAdmin()
+      .from("clients")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) return serverError(error);
+    if (!data) return notFound("Client not found");
+    return ok(data);
+  } catch (e) {
+    return serverError(e);
+  }
+}
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  const parsed = await parseBody(req, clientUpdateSchema);
+  if ("error" in parsed) return parsed.error;
+  try {
+    const { id } = await params;
+    const { data, error } = await supabaseAdmin()
+      .from("clients")
+      .update(parsed.data)
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) return serverError(error);
+    if (!data) return notFound("Client not found");
+    return ok(data);
+  } catch (e) {
+    return serverError(e);
+  }
+}
+
+export async function DELETE(_req: Request, { params }: Ctx) {
+  try {
+    const { id } = await params;
+    const { error } = await supabaseAdmin().from("clients").delete().eq("id", id);
+    if (error) return serverError(error);
+    return ok({ ok: true });
+  } catch (e) {
+    return serverError(e);
+  }
+}
