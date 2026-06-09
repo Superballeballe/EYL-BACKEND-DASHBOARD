@@ -6,6 +6,11 @@
 -- migration, every booking placed in the app automatically shows up in the
 -- dashboard's delivery list, tagged with provenance `src_sheet = 'app'`.
 --
+-- Column mapping below tracks what the app actually inserts (EYL-APP-2
+-- src/lib/orders.ts): order_code / pickup_address / delivery_address /
+-- recipient_* / total_price, plus an `item_type` JSONB blob that carries the
+-- description, distance and sender details, and a `payment_method` JSONB.
+--
 -- Prerequisite: the app schema must already exist (public.orders) —
 -- see EYL-APP-2/supabase/schema.sql. Apply 0001_init.sql first, then the
 -- app schema, then this file.
@@ -13,6 +18,15 @@
 -- Idempotent: a back-reference column + unique guard means re-running the
 -- backfill (or a replayed insert) never creates duplicate deliveries.
 -- =====================================================================
+
+-- 0. Fail clearly if applied out of order (orders must exist first).
+do $$
+begin
+  if to_regclass('public.orders') is null then
+    raise exception
+      'public.orders not found — apply the app schema (EYL-APP-2/supabase/schema.sql) before this migration';
+  end if;
+end $$;
 
 -- 1. Back-reference: trace each delivery to its source order, and make the
 --    sync idempotent. UNIQUE allows many NULLs, so manual/imported
@@ -58,29 +72,25 @@ begin
   values (
     o.id,
     o.created_at::date,
-    o.created_at::date,                       -- no scheduled date in the app; default to booking day
-    'online',                                 -- app bookings are always online
-    coalesce(o.sender_name, o.user_name),
-    o.pickup_label,
-    o.drop_label,
+    o.created_at::date,                          -- no scheduled date in the app; default to booking day
+    'online',                                    -- app bookings are always online
+    o.item_type->>'sender_name',                 -- sender details live in the item_type blob
+    o.pickup_address,
+    o.delivery_address,
     o.recipient_name,
-    o.price,                                  -- integer -> numeric(12,2)
-    o.distance_km,
-    nullif(trim(coalesce(o.weight_kg::text, '') || ' kg'), 'kg'),
+    o.total_price,                               -- numeric -> numeric(12,2)
+    nullif(o.item_type->>'distance_km', '')::numeric,
+    o.item_type->>'label',                       -- human description, e.g. "2kg sweets"
     'app',
     false,
     jsonb_build_object(
-      'order_id',        o.order_id,
-      'user_name',       o.user_name,
-      'user_phone',      o.user_phone,
-      'sender_phone',    o.sender_phone,
+      'order_code',      o.order_code,
       'recipient_phone', o.recipient_phone,
-      'weight_kg',       o.weight_kg,
-      'pickup', jsonb_build_object('label', o.pickup_label, 'lat', o.pickup_lat, 'lon', o.pickup_lon),
-      'drop',   jsonb_build_object('label', o.drop_label,   'lat', o.drop_lat,   'lon', o.drop_lon)
+      'item_type',       o.item_type,
+      'payment_method',  o.payment_method
     )
   )
-  on conflict (app_order_id) do nothing;      -- already synced -> no-op
+  on conflict (app_order_id) do nothing;         -- already synced -> no-op
 end;
 $$;
 
