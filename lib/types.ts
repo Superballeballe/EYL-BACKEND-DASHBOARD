@@ -96,6 +96,7 @@ export type Delivery = {
   knight_id: string | null;
   knight_name: string | null;
   assignment_status: "assigned" | "cancelled";
+  fulfillment_status: "placed" | "picked_up" | "in_transit" | "delivered" | "cancelled";
   fees: number | null;
   kms: number | null;
   working_hours: string | null;
