@@ -72,6 +72,21 @@ export function PaymentBadge({ status }: { status: string | null | undefined }) 
   return <span className={`badge ${cls}`}>{status}</span>;
 }
 
+const FULFILLMENT_META: Record<string, { label: string; cls: string }> = {
+  placed: { label: "Placed", cls: "badge-gray" },
+  picked_up: { label: "Picked up", cls: "badge-amber" },
+  in_transit: { label: "In transit", cls: "badge-blue" },
+  delivered: { label: "Delivered", cls: "badge-green" },
+  cancelled: { label: "Cancelled", cls: "badge-red" },
+};
+
+export function FulfillmentBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <span className="badge badge-gray">—</span>;
+  const meta = FULFILLMENT_META[status];
+  if (!meta) return <span className="badge badge-gray">{status}</span>;
+  return <span className={`badge ${meta.cls}`}>{meta.label}</span>;
+}
+
 export function EmptyState({ message }: { message: string }) {
   return (
     <div className="card p-10 text-center text-[var(--muted)] text-sm">{message}</div>

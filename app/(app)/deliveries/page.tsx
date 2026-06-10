@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { PageHeader, PaymentBadge, EmptyState } from "@/components/ui";
+import { PageHeader, PaymentBadge, FulfillmentBadge, EmptyState } from "@/components/ui";
 import { fmtDate, money } from "@/lib/format";
 import type { Delivery, Knight } from "@/lib/types";
 
@@ -130,6 +130,7 @@ export default async function DeliveriesPage({
                 <th>Sender</th>
                 <th>Pickup → Drop</th>
                 <th>Knight</th>
+                <th>Status</th>
                 <th>Fees</th>
                 <th>Payment</th>
                 <th>Content</th>
@@ -154,6 +155,7 @@ export default async function DeliveriesPage({
                     )}
                   </td>
                   <td>{d.knight_name ?? "—"}</td>
+                  <td><FulfillmentBadge status={d.fulfillment_status} /></td>
                   <td className="whitespace-nowrap">{money(d.fees)}</td>
                   <td><PaymentBadge status={d.payment_status} /></td>
                   <td className="text-xs max-w-[12rem] truncate">{d.content ?? "—"}</td>
