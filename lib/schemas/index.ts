@@ -58,6 +58,14 @@ const roleField = z.any().transform((v): "walker" | "biker" | null => {
 const assignmentStatusField = z.any().transform((v): "assigned" | "cancelled" =>
   String(v ?? "").trim().toLowerCase() === "cancelled" ? "cancelled" : "assigned",
 );
+const fulfillmentStatusField = z.any().transform(
+  (v): "placed" | "picked_up" | "in_transit" | "delivered" | "cancelled" => {
+    const s = String(v ?? "").trim().toLowerCase().replace(/[\s-]/g, "_");
+    return s === "picked_up" || s === "in_transit" || s === "delivered" || s === "cancelled"
+      ? (s as "picked_up" | "in_transit" | "delivered" | "cancelled")
+      : "placed";
+  },
+);
 const lineupStatusField = z.any().transform((v): "working" | "leave" | "half_day" => {
   const s = String(v ?? "").trim().toLowerCase().replace(/[\s-]/g, "_");
   return s === "leave" || s === "half_day" ? (s as "leave" | "half_day") : "working";
@@ -95,6 +103,7 @@ export const deliverySchema = z.object({
   knight_id: nuuid,
   knight_name: nstr,
   assignment_status: assignmentStatusField,
+  fulfillment_status: fulfillmentStatusField,
 
   fees: nnum,
   kms: nnum,

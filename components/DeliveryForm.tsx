@@ -73,6 +73,7 @@ export default function DeliveryForm({
       task_date: today,
       mode_of_booking: "online",
       assignment_status: "assigned",
+      fulfillment_status: "placed",
       ...(initial ?? {}),
     },
   });
@@ -199,6 +200,15 @@ export default function DeliveryForm({
         <Field label="Status">
           <select className="select" {...register("assignment_status")}>
             <option value="assigned">Assigned</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </Field>
+        <Field label="Delivery status (shown to customer)">
+          <select className="select" {...register("fulfillment_status")}>
+            <option value="placed">Placed</option>
+            <option value="picked_up">Picked up</option>
+            <option value="in_transit">In transit</option>
+            <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
         </Field>
