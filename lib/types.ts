@@ -80,6 +80,7 @@ export type RateTier = {
 
 export type Delivery = {
   id: string;
+  app_order_id: string | null;
   serial_no: number | null;
   booking_date: string | null;
   task_date: string | null;
@@ -118,6 +119,16 @@ export type Delivery = {
   src_row: number | null;
   needs_review: boolean;
   raw: unknown;
+  app_order?: {
+    id: string;
+    order_code: string | null;
+    status: "registered" | "accepted" | "rider_assigned" | "picked_up" | "delivered" | "cancelled" | string | null;
+    rider_name?: string | null;
+    pickup_scheduled_at?: string | null;
+    delivery_scheduled_at?: string | null;
+    accepted_at?: string | null;
+    rider_assigned_at?: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
 };

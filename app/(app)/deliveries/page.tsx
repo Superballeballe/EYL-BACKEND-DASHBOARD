@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PageHeader, PaymentBadge, FulfillmentBadge, EmptyState } from "@/components/ui";
+import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import { fmtDate, money } from "@/lib/format";
 import type { Delivery, Knight } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const LIMIT = 50;
+const LIMIT = 100;
 
 type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -58,8 +59,33 @@ export default async function DeliveriesPage({
     );
   }
 
-  const { data, count } = await query;
-  const rows = (data ?? []) as Delivery[];
+  const { data, count, error: deliveriesError } = await query;
+  const deliveryRows = (data ?? []) as Delivery[];
+  const appOrderIds = Array.from(
+    new Set(deliveryRows.map((row) => row.app_order_id).filter((id): id is string => Boolean(id))),
+  );
+  const appOrdersById = new Map<string, NonNullable<Delivery["app_order"]>>();
+  let appOrdersError: string | null = null;
+
+  if (appOrderIds.length > 0) {
+    const { data: appOrders, error } = await db
+      .from("orders")
+      .select("id, order_code, status, rider_name, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at")
+      .in("id", appOrderIds);
+
+    if (error) {
+      appOrdersError = error.message;
+    } else {
+      for (const order of appOrders ?? []) {
+        appOrdersById.set(order.id, order as NonNullable<Delivery["app_order"]>);
+      }
+    }
+  }
+
+  const rows = deliveryRows.map((row) => ({
+    ...row,
+    app_order: row.app_order_id ? appOrdersById.get(row.app_order_id) ?? null : null,
+  }));
   const total = count ?? 0;
 
   return (
@@ -119,9 +145,17 @@ export default async function DeliveriesPage({
         </label>
       </form>
 
-      {rows.length === 0 ? (
+      {deliveriesError ? (
+        <EmptyState message={`Could not load deliveries: ${deliveriesError.message}`} />
+      ) : appOrdersError ? (
+        <div className="card p-3 mb-4 text-sm bg-[#fff4e5] border-[#f3d9a8] text-[#9a6700]">
+          Deliveries loaded, but app order status could not be loaded: {appOrdersError}
+        </div>
+      ) : null}
+
+      {!deliveriesError && rows.length === 0 ? (
         <EmptyState message="No deliveries match these filters." />
-      ) : (
+      ) : !deliveriesError ? (
         <div className="card overflow-x-auto">
           <table className="data">
             <thead>
@@ -134,6 +168,7 @@ export default async function DeliveriesPage({
                 <th>Fees</th>
                 <th>Payment</th>
                 <th>Content</th>
+                <th>Actions</th>
                 <th></th>
               </tr>
             </thead>
@@ -155,10 +190,20 @@ export default async function DeliveriesPage({
                     )}
                   </td>
                   <td>{d.knight_name ?? "—"}</td>
-                  <td><FulfillmentBadge status={d.fulfillment_status} /></td>
+                  <td>
+                    <FulfillmentBadge status={d.fulfillment_status} />
+                    {d.app_order?.status ? (
+                      <div className="mt-1 text-[0.7rem] text-[var(--muted)]">
+                        App: {d.app_order.status.replace(/_/g, " ")}
+                      </div>
+                    ) : null}
+                  </td>
                   <td className="whitespace-nowrap">{money(d.fees)}</td>
                   <td><PaymentBadge status={d.payment_status} /></td>
                   <td className="text-xs max-w-[12rem] truncate">{d.content ?? "—"}</td>
+                  <td>
+                    <DeliveryLifecycleActions delivery={d} knights={knights} />
+                  </td>
                   <td>
                     <Link href={`/deliveries/${d.id}/edit`} className="text-[var(--brand)] hover:underline text-sm">
                       Edit
@@ -169,7 +214,7 @@ export default async function DeliveriesPage({
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       {total > LIMIT && (
         <Pagination sp={sp} offset={offset} total={total} />
