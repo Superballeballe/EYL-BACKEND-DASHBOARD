@@ -244,6 +244,8 @@ update public.orders o
        else o.status
      end;
 
+alter table public.orders replica identity full;
+
 do $$
 begin
   alter publication supabase_realtime add table public.orders;

@@ -155,6 +155,8 @@ update public.orders o
      end;
 
 -- 5. Live updates: let the app subscribe to its own order rows.
+alter table public.orders replica identity full;
+
 do $$
 begin
   alter publication supabase_realtime add table public.orders;
