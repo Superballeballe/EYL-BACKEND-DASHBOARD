@@ -12,6 +12,29 @@ const LIMIT = 100;
 type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
+const APP_ORDER_SELECTS = [
+  "id, order_code, status, rider_name, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
+  "id, order_code, status",
+  "id, order_code",
+];
+
+async function loadAppOrders(
+  db: ReturnType<typeof supabaseAdmin>,
+  appOrderIds: string[],
+): Promise<{ orders: NonNullable<Delivery["app_order"]>[]; error: string | null }> {
+  for (const columns of APP_ORDER_SELECTS) {
+    const { data, error } = await db.from("orders").select(columns).in("id", appOrderIds);
+    if (!error) {
+      return {
+        orders: (data ?? []) as unknown as NonNullable<Delivery["app_order"]>[],
+        error: null,
+      };
+    }
+  }
+
+  return { orders: [], error: "App order status could not be loaded." };
+}
+
 export default async function DeliveriesPage({
   searchParams,
 }: {
@@ -68,15 +91,11 @@ export default async function DeliveriesPage({
   let appOrdersError: string | null = null;
 
   if (appOrderIds.length > 0) {
-    const { data: appOrders, error } = await db
-      .from("orders")
-      .select("id, order_code, status, rider_name, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at")
-      .in("id", appOrderIds);
-
+    const { orders: appOrders, error } = await loadAppOrders(db, appOrderIds);
     if (error) {
-      appOrdersError = error.message;
+      appOrdersError = error;
     } else {
-      for (const order of appOrders ?? []) {
+      for (const order of appOrders) {
         appOrdersById.set(order.id, order as NonNullable<Delivery["app_order"]>);
       }
     }
