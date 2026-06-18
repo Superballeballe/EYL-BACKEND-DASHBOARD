@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
+import { sendOrderAssignedNotification } from "@/lib/server/expoPush";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -199,6 +200,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
       const { data, error } = await updateLinkedOrder(db, linkedDelivery.app_order_id, orderPatch);
       if (error) return serverError(error);
       updatedOrder = data;
+
+      if (action.action === "assign") {
+        try {
+          await sendOrderAssignedNotification(db, {
+            orderId: linkedDelivery.app_order_id,
+            knightName: orderPatch.rider_name as string,
+          });
+        } catch (error) {
+          console.warn("[notifications] failed to send assignment push:", error);
+        }
+      }
     }
 
     return ok({
