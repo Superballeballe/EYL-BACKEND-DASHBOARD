@@ -36,6 +36,33 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function floorToMinute(date: Date) {
+  const floored = new Date(date);
+  floored.setSeconds(0, 0);
+  return floored;
+}
+
+function parseDateTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function validateScheduleTimes(pickupIso: string | null | undefined, deliveryIso: string | null | undefined) {
+  const pickupAt = parseDateTime(pickupIso);
+  const deliveryAt = parseDateTime(deliveryIso);
+
+  if (pickupAt && pickupAt < floorToMinute(new Date())) {
+    return "Pickup time cannot be earlier than the current time.";
+  }
+
+  if (pickupAt && deliveryAt && deliveryAt < pickupAt) {
+    return "Delivery time cannot be earlier than pickup time.";
+  }
+
+  return null;
+}
+
 function nowClock() {
   return new Intl.DateTimeFormat("en-IN", {
     hour: "2-digit",
@@ -91,9 +118,18 @@ async function getKnightName(knightId: string | null | undefined, fallbackName: 
 }
 
 function legacyOrderStatus(status: unknown) {
-  if (status === "accepted" || status === "rider_assigned") return "placed";
-  if (status === "picked_up" || status === "delivered" || status === "cancelled") return status;
+  if (status === "accepted") return "placed";
+  if (status === "rider_assigned" || status === "picked_up") return "in_transit";
+  if (status === "delivered") return "completed";
+  if (status === "cancelled") return "canceled";
   return status;
+}
+
+function assignmentOrderStatus(fulfillmentStatus: string | null | undefined) {
+  if (fulfillmentStatus === "delivered") return "delivered";
+  if (fulfillmentStatus === "picked_up") return "picked_up";
+  if (fulfillmentStatus === "cancelled") return "cancelled";
+  return "rider_assigned";
 }
 
 function stripNewOrderColumns(patch: OrderPatch) {
@@ -103,22 +139,26 @@ function stripNewOrderColumns(patch: OrderPatch) {
 }
 
 async function updateLinkedOrder(db: ReturnType<typeof supabaseAdmin>, orderId: string, desiredPatch: OrderPatch) {
-  const selectColumns = "id, order_code, status";
-  const update = async (patch: OrderPatch) =>
+  const richSelectColumns =
+    "id, order_code, status, rider_name, accepted_at, rider_assigned_at, pickup_scheduled_at, delivery_scheduled_at";
+  const baseSelectColumns = "id, order_code, status";
+  const update = async (patch: OrderPatch, selectColumns = richSelectColumns) =>
     db.from("orders").update(patch).eq("id", orderId).select(selectColumns).maybeSingle();
 
   let result = await update(desiredPatch);
   if (!result.error) return result;
 
   let fallbackPatch = stripNewOrderColumns(desiredPatch);
-  result = await update(fallbackPatch);
+  if (Object.keys(fallbackPatch).length === 0) return result;
+
+  result = await update(fallbackPatch, baseSelectColumns);
   if (!result.error) return result;
 
   fallbackPatch = {
     ...fallbackPatch,
     status: legacyOrderStatus(fallbackPatch.status),
   };
-  return update(fallbackPatch);
+  return update(fallbackPatch, baseSelectColumns);
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
@@ -147,6 +187,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (action.action === "confirm") {
       return badRequest("Assign a knight before confirming the order.");
     } else if (action.action === "assign") {
+      const scheduleError = validateScheduleTimes(action.pickup_scheduled_at, action.delivery_scheduled_at);
+      if (scheduleError) return badRequest(scheduleError);
+
       const knightName = await getKnightName(action.knight_id, action.knight_name);
       if (!knightName) return badRequest("Knight is required");
 
@@ -163,7 +206,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
         localDateInIndia(action.delivery_scheduled_at) ??
         linkedDelivery.task_date;
 
-      orderPatch.status = "rider_assigned";
+      orderPatch.status = assignmentOrderStatus(linkedDelivery.fulfillment_status);
       orderPatch.rider_name = knightName;
       orderPatch.accepted_at = stamp;
       orderPatch.rider_assigned_at = stamp;
@@ -206,6 +249,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
           await sendOrderAssignedNotification(db, {
             orderId: linkedDelivery.app_order_id,
             knightName: orderPatch.rider_name as string,
+            pickupScheduledAt: orderPatch.pickup_scheduled_at as string | null | undefined,
+            deliveryScheduledAt: orderPatch.delivery_scheduled_at as string | null | undefined,
           });
         } catch (error) {
           console.warn("[notifications] failed to send assignment push:", error);

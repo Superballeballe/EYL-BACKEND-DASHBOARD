@@ -7,7 +7,7 @@ export default function AppLayout({
     <div className="flex min-h-screen">
       <Nav />
       <main className="flex-1 min-w-0">
-        <div className="mx-auto max-w-7xl px-6 py-7">{children}</div>
+        <div className="mx-auto max-w-[104rem] px-6 py-7">{children}</div>
       </main>
     </div>
   );

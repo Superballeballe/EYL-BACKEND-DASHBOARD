@@ -32,14 +32,36 @@ function Field({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  variant = "page",
+}: {
+  title: string;
+  children: React.ReactNode;
+  variant?: "page" | "modal";
+}) {
+  const isModal = variant === "modal";
+
   return (
-    <div className="card p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)] mb-4">
+    <section
+      className={
+        isModal
+          ? "border-t border-[var(--border)] pt-4 first:border-t-0 first:pt-0"
+          : "card p-5"
+      }
+    >
+      <h2
+        className={`text-sm font-bold uppercase tracking-wider text-[var(--muted)] ${
+          isModal ? "mb-3" : "mb-4"
+        }`}
+      >
         {title}
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-    </div>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isModal ? "gap-3" : "gap-4"}`}>
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -50,6 +72,9 @@ export default function DeliveryForm({
   knights,
   clients,
   rateTiers,
+  onSaved,
+  onCancel,
+  variant = "page",
 }: {
   mode: "new" | "edit";
   id?: string;
@@ -57,6 +82,9 @@ export default function DeliveryForm({
   knights: KnightOpt[];
   clients: ClientOpt[];
   rateTiers: RateTier[];
+  onSaved?: (delivery: Record<string, any>) => void;
+  onCancel?: () => void;
+  variant?: "page" | "modal";
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -113,8 +141,14 @@ export default function DeliveryForm({
         body: JSON.stringify(values),
       });
       if (res.ok) {
-        router.push("/deliveries");
-        router.refresh();
+        const saved = await res.json().catch(() => null);
+        if (onSaved && saved) {
+          onSaved(saved);
+          router.refresh();
+        } else {
+          router.push("/deliveries");
+          router.refresh();
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         setError(data.error || "Save failed");
@@ -127,8 +161,8 @@ export default function DeliveryForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <Section title="Booking">
+    <form onSubmit={handleSubmit(onSubmit)} className={variant === "modal" ? "space-y-4" : "space-y-5"}>
+      <Section title="Booking" variant={variant}>
         <Field label="Task date">
           <input type="date" className="input" {...register("task_date")} />
         </Field>
@@ -147,7 +181,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Sender">
+      <Section title="Sender" variant={variant}>
         <Field label="Name">
           <input className="input" {...register("sender_name")} placeholder="Business / person sending" />
         </Field>
@@ -156,7 +190,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Pickup">
+      <Section title="Pickup" variant={variant}>
         <Field label="Pickup location">
           <input className="input" {...register("pickup_location")} />
         </Field>
@@ -168,7 +202,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Drop">
+      <Section title="Drop" variant={variant}>
         <Field label="Drop location">
           <input className="input" {...register("drop_location")} />
         </Field>
@@ -183,7 +217,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Assignment">
+      <Section title="Assignment" variant={variant}>
         <Field label="Knight (name)">
           <input
             className="input"
@@ -217,7 +251,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Money & payment">
+      <Section title="Money & payment" variant={variant}>
         <Field label="Fees (₹)">
           <input type="number" step="0.01" className="input" {...register("fees")} />
           {suggestedFee != null && (
@@ -259,7 +293,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Billing">
+      <Section title="Billing" variant={variant}>
         <Field label="Billing name">
           <input
             className="input"
@@ -290,7 +324,7 @@ export default function DeliveryForm({
         </Field>
       </Section>
 
-      <Section title="Notes">
+      <Section title="Notes" variant={variant}>
         <Field label="Content / parcel" wide>
           <input className="input" {...register("content")} />
         </Field>
@@ -311,7 +345,7 @@ export default function DeliveryForm({
         <button type="submit" className="btn btn-primary" disabled={saving}>
           {saving ? "Saving…" : mode === "new" ? "Create delivery" : "Save changes"}
         </button>
-        <button type="button" className="btn btn-secondary" onClick={() => router.back()}>
+        <button type="button" className="btn btn-secondary" onClick={onCancel ?? (() => router.back())}>
           Cancel
         </button>
       </div>

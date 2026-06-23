@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { PageHeader, PaymentBadge, FulfillmentBadge, EmptyState } from "@/components/ui";
-import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
-import { fmtDate, money } from "@/lib/format";
-import type { Delivery, Knight } from "@/lib/types";
+import { PageHeader, EmptyState } from "@/components/ui";
+import DeliveryTable from "@/components/DeliveryTable";
+import { getDeliveryFormOptions } from "@/lib/server/formOptions";
+import { fmtDate } from "@/lib/format";
+import type { Delivery } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +52,7 @@ export default async function DeliveriesPage({
   const offset = Math.max(0, Number(one(sp.offset)) || 0);
 
   const db = supabaseAdmin();
-  const knightsRes = await db.from("knights").select("*").order("display_name");
-  const knights = (knightsRes.data ?? []) as Knight[];
+  const { knights, clients, rateTiers } = await getDeliveryFormOptions();
 
   let query = db
     .from("deliveries")
@@ -175,64 +175,12 @@ export default async function DeliveriesPage({
       {!deliveriesError && rows.length === 0 ? (
         <EmptyState message="No deliveries match these filters." />
       ) : !deliveriesError ? (
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Sender</th>
-                <th>Pickup → Drop</th>
-                <th>Knight</th>
-                <th>Status</th>
-                <th>Fees</th>
-                <th>Payment</th>
-                <th>Content</th>
-                <th>Actions</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr key={d.id}>
-                  <td className="whitespace-nowrap">
-                    {fmtDate(d.task_date)}
-                    {d.needs_review && <span className="badge badge-amber ml-1">review</span>}
-                    {d.assignment_status === "cancelled" && (
-                      <span className="badge badge-red ml-1">cancelled</span>
-                    )}
-                  </td>
-                  <td className="font-medium">{d.sender_name ?? "—"}</td>
-                  <td className="text-xs max-w-[16rem]">
-                    {d.pickup_location ?? "—"} → {d.drop_location ?? "—"}
-                    {d.drop_recipient_name && (
-                      <div className="text-[var(--muted)]">to {d.drop_recipient_name}</div>
-                    )}
-                  </td>
-                  <td>{d.knight_name ?? "—"}</td>
-                  <td>
-                    <FulfillmentBadge status={d.fulfillment_status} />
-                    {d.app_order?.status ? (
-                      <div className="mt-1 text-[0.7rem] text-[var(--muted)]">
-                        App: {d.app_order.status.replace(/_/g, " ")}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="whitespace-nowrap">{money(d.fees)}</td>
-                  <td><PaymentBadge status={d.payment_status} /></td>
-                  <td className="text-xs max-w-[12rem] truncate">{d.content ?? "—"}</td>
-                  <td>
-                    <DeliveryLifecycleActions delivery={d} knights={knights} />
-                  </td>
-                  <td>
-                    <Link href={`/deliveries/${d.id}/edit`} className="text-[var(--brand)] hover:underline text-sm">
-                      Edit
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DeliveryTable
+          rows={rows}
+          knights={knights}
+          clients={clients}
+          rateTiers={rateTiers}
+        />
       ) : null}
 
       {total > LIMIT && (

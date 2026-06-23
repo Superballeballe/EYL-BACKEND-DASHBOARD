@@ -12,15 +12,40 @@ type PushTokenRow = {
 type SendOrderAssignedOptions = {
   orderId: string;
   knightName: string;
+  pickupScheduledAt?: string | null;
+  deliveryScheduledAt?: string | null;
 };
 
 function isExpoPushToken(token: string) {
   return /^ExponentPushToken\[[\w-]+\]$/.test(token) || /^ExpoPushToken\[[\w-]+\]$/.test(token);
 }
 
+function formatPushTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
+}
+
+function isMissingPushTokenTable(error: { code?: string; message?: string }) {
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    error.message?.includes("Could not find the table 'public.app_push_tokens'") ||
+    error.message?.includes("app_push_tokens' in the schema cache")
+  );
+}
+
 export async function sendOrderAssignedNotification(
   db: SupabaseClient,
-  { orderId, knightName }: SendOrderAssignedOptions,
+  { orderId, knightName, pickupScheduledAt, deliveryScheduledAt }: SendOrderAssignedOptions,
 ) {
   const { data: order, error: orderError } = await db
     .from("orders")
@@ -39,7 +64,10 @@ export async function sendOrderAssignedNotification(
     .eq("user_id", target.user_id)
     .eq("enabled", true);
 
-  if (tokenError) throw new Error(tokenError.message);
+  if (tokenError) {
+    if (isMissingPushTokenTable(tokenError)) return { sent: 0 };
+    throw new Error(tokenError.message);
+  }
 
   const pushTokens = ((tokens ?? []) as PushTokenRow[])
     .map((row) => row.token)
@@ -55,7 +83,12 @@ export async function sendOrderAssignedNotification(
     data: {
       type: "order_assigned",
       orderId,
-      orderCode: target.order_code
+      orderCode: target.order_code,
+      pickupScheduledAt: pickupScheduledAt ?? null,
+      deliveryScheduledAt: deliveryScheduledAt ?? null,
+      dropScheduledAt: deliveryScheduledAt ?? null,
+      pickupTime: formatPushTime(pickupScheduledAt),
+      dropTime: formatPushTime(deliveryScheduledAt)
     }
   }));
 

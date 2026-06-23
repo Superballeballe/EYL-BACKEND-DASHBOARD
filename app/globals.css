@@ -138,7 +138,32 @@ table.data td {
   padding: 0.6rem 0.75rem;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  transition: background 0.12s ease;
+}
+table.data tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+table.data tbody tr:nth-child(even) td {
+  background: #f6f8fb;
 }
 table.data tr:hover td {
-  background: #fafbfc;
+  background: #edf4ff;
+}
+table.data tbody tr:focus-visible td {
+  background: #e8f0fe;
+}
+
+.clamp-1,
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.clamp-1 {
+  -webkit-line-clamp: 1;
+}
+
+.clamp-2 {
+  -webkit-line-clamp: 2;
 }

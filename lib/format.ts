@@ -10,6 +10,14 @@ export function fmtDate(s: string | null | undefined): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+export function fmtShortDate(s: string | null | undefined): string {
+  if (!s) return "—";
+  const d = new Date(s.length <= 10 ? s + "T00:00:00" : s);
+  if (Number.isNaN(d.getTime())) return s;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
+}
+
 export function fmtMonth(s: string | null | undefined): string {
   if (!s) return "—";
   const d = new Date(s + "T00:00:00");
