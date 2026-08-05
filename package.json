@@ -10,7 +10,13 @@
     "import": "tsx scripts/import-excel.ts"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "^3.9.0",
+    "@mui/icons-material": "^9.2.0",
+    "@mui/material": "^9.2.0",
+    "@mui/material-nextjs": "^9.1.1",
+    "@mui/x-charts": "^9.10.1",
     "@supabase/supabase-js": "^2.45.4",
     "lucide-react": "^1.21.0",
     "next": "^15.1.6",

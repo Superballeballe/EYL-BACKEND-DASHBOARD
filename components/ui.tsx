@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Box, Card, CardContent, Chip, Typography } from "@mui/material";
+import { gray } from "@/lib/surface";
 
 export function PageHeader({
   title,
@@ -10,15 +12,36 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        {subtitle && <div className="text-sm text-[var(--muted)] mt-1">{subtitle}</div>}
-      </div>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 2,
+        mb: 3,
+        p: 2.5,
+        borderRadius: 1,
+        border: `1px solid ${gray.border}`,
+        bgcolor: "#fff",
+      }}
+    >
+      <Box>
+        <Typography variant="h1">{title}</Typography>
+        {subtitle ? (
+          <Box sx={{ mt: 0.5, color: "text.secondary", typography: "body2" }}>{subtitle}</Box>
+        ) : null}
+      </Box>
       {action}
-    </div>
+    </Box>
   );
 }
+
+const TONE_COLOR = {
+  default: "text.primary",
+  green: "primary.main",
+  red: "error.main",
+  amber: "warning.main",
+} as const;
 
 export function StatCard({
   label,
@@ -33,62 +56,141 @@ export function StatCard({
   href?: string;
   tone?: "default" | "green" | "red" | "amber";
 }) {
-  const toneColor =
-    tone === "green"
-      ? "text-[#1a7f37]"
-      : tone === "red"
-        ? "text-[#b42318]"
-        : tone === "amber"
-          ? "text-[#9a6700]"
-          : "text-[var(--text)]";
-  const body = (
-    <div className="card p-4 h-full">
-      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-        {label}
-      </div>
-      <div className={`text-2xl font-bold mt-1 ${toneColor}`}>{value}</div>
-      {hint && <div className="text-xs text-[var(--muted)] mt-1">{hint}</div>}
-    </div>
+  const card = (
+    <Card
+      sx={{
+        height: "100%",
+        transition: "border-color .15s, background-color .15s",
+        bgcolor: "#fff",
+        ...(href ? { "&:hover": { borderColor: "primary.light", bgcolor: gray.surface } } : null),
+      }}
+    >
+      <CardContent sx={{ py: 2, "&:last-child": { pb: 2 } }}>
+        <Box
+          sx={{
+            display: "inline-block",
+            px: 1,
+            py: 0.25,
+            mb: 1,
+            borderRadius: 0.75,
+            bgcolor: gray.surface,
+            typography: "overline",
+            color: "text.secondary",
+            fontWeight: 700,
+          }}
+        >
+          {label}
+        </Box>
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 700,
+            color: TONE_COLOR[tone],
+          }}
+        >
+          {value}
+        </Typography>
+        {hint ? (
+          <Typography variant="caption" sx={{ mt: 0.5, color: "text.secondary", display: "block" }}>
+            {hint}
+          </Typography>
+        ) : null}
+      </CardContent>
+    </Card>
   );
-  return href ? (
-    <Link href={href} className="block hover:opacity-90 transition-opacity">
-      {body}
-    </Link>
-  ) : (
-    body
+
+  if (!href) return card;
+  return (
+    <Box
+      component={Link}
+      href={href}
+      sx={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}
+    >
+      {card}
+    </Box>
   );
 }
 
 export function PaymentBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <span className="badge badge-gray">—</span>;
-  const cls =
-    status === "paid"
-      ? "badge-green"
-      : status === "unpaid"
-        ? "badge-red"
-        : status === "free"
-          ? "badge-blue"
-          : "badge-amber";
-  return <span className={`badge ${cls}`}>{status}</span>;
+  if (!status) return <Chip size="small" label="—" variant="outlined" />;
+  const color = status === "paid" || status === "free" ? "primary" : "default";
+  return (
+    <Chip
+      size="small"
+      color={color as "primary" | "default"}
+      label={status}
+      variant={status === "unpaid" ? "outlined" : "filled"}
+    />
+  );
 }
 
-const FULFILLMENT_META: Record<string, { label: string; cls: string }> = {
-  placed: { label: "Placed", cls: "badge-gray" },
-  picked_up: { label: "Picked up", cls: "badge-amber" },
-  in_transit: { label: "In transit", cls: "badge-blue" },
-  delivered: { label: "Delivered", cls: "badge-green" },
-  cancelled: { label: "Cancelled", cls: "badge-red" },
+const FULFILLMENT_LABEL: Record<string, string> = {
+  booked: "Booked",
+  accepted: "Accepted",
+  active: "Active",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 export function FulfillmentBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <span className="badge badge-gray">—</span>;
-  const meta = FULFILLMENT_META[status];
-  if (!meta) return <span className="badge badge-gray">{status}</span>;
-  return <span className={`badge ${meta.cls}`}>{meta.label}</span>;
+  if (!status) return <Chip size="small" label="—" variant="outlined" />;
+  const label = FULFILLMENT_LABEL[status] ?? status;
+  const strong = status === "booked" || status === "accepted" || status === "active";
+  return (
+    <Chip
+      size="small"
+      label={label}
+      color={strong ? "primary" : "default"}
+      variant={strong ? "filled" : "outlined"}
+    />
+  );
 }
 
-export function EmptyState({ message }: { message: string }) {
+export function EmptyState({
+  message,
+  compact = false,
+}: {
+  message: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <Box
+        sx={{
+          py: 2.5,
+          px: 2,
+          textAlign: "center",
+          borderRadius: 1,
+          border: "1px dashed",
+          borderColor: "divider",
+          bgcolor: gray.surface,
+        }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {message}
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
-    <div className="card p-10 text-center text-[var(--muted)] text-sm">{message}</div>
+    <Card sx={{ bgcolor: gray.surface, borderStyle: "dashed" }}>
+      <CardContent sx={{ py: 5, textAlign: "center" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {message}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Typography
+      variant="overline"
+      sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: "0.06em", display: "block", mb: 1.5 }}
+    >
+      {children}
+    </Typography>
   );
 }

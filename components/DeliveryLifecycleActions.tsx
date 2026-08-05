@@ -2,6 +2,30 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import ScheduleDateTimeField from "@/components/ScheduleDateTimeField";
+import {
+  isScheduleInputBefore,
+  isScheduleInputBeforeNow,
+  isWithinWorkingHours,
+  nowDatetimeLocalInput,
+  scheduleInputToIso,
+  toDatetimeLocalValue,
+  workingHoursError,
+} from "@/lib/format";
 
 type KnightOpt = { id: string; display_name: string };
 type AppOrderSummary = {
@@ -20,6 +44,9 @@ type DeliverySnapshot = {
   knight_id: string | null;
   knight_name: string | null;
   fulfillment_status: string | null;
+  task_date?: string | null;
+  pickup_time_window?: string | null;
+  drop_time_window?: string | null;
   app_order?: AppOrderSummary | null;
 };
 
@@ -55,39 +82,58 @@ const statusRank: Record<string, number> = {
   canceled: -1,
 };
 
-function toInputValue(iso: string | null | undefined) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return toInputValueFromDate(date);
+function defaultScheduleTimes() {
+  const pickup = new Date();
+  pickup.setSeconds(0, 0);
+  pickup.setMinutes(Math.ceil(pickup.getMinutes() / 15) * 15);
+  pickup.setMinutes(pickup.getMinutes() + 30);
+
+  const startMins = 8 * 60;
+  const endMins = 20 * 60 + 30;
+  let mins = pickup.getHours() * 60 + pickup.getMinutes();
+  if (mins < startMins) pickup.setHours(8, 0, 0, 0);
+  else if (mins > endMins) {
+    pickup.setDate(pickup.getDate() + 1);
+    pickup.setHours(8, 0, 0, 0);
+  }
+
+  const drop = new Date(pickup);
+  drop.setMinutes(drop.getMinutes() + 60);
+  if (drop.getHours() * 60 + drop.getMinutes() > endMins) {
+    drop.setHours(20, 30, 0, 0);
+  }
+
+  return {
+    pickup: toDatetimeLocalValue(pickup.toISOString()),
+    drop: toDatetimeLocalValue(drop.toISOString()),
+  };
 }
 
-function toInputValueFromDate(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function nowInputValue() {
-  const date = new Date();
-  date.setSeconds(0, 0);
-  return toInputValueFromDate(date);
-}
-
-function toIso(value: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+function resolveScheduleInput(
+  primary: string | null | undefined,
+  fallback: string | null | undefined,
+  taskDate: string | null | undefined,
+  defaultValue: string,
+) {
+  return (
+    toDatetimeLocalValue(primary, taskDate) ||
+    toDatetimeLocalValue(fallback, taskDate) ||
+    defaultValue
+  );
 }
 
 export default function DeliveryLifecycleActions({
   delivery,
   knights,
   compact = false,
+  variant = "default",
   onUpdated,
 }: {
   delivery: DeliverySnapshot;
   knights: KnightOpt[];
   compact?: boolean;
+  /** pending = assign only; running = edit + pickup/done by stage; default = all actions */
+  variant?: "default" | "pending" | "running";
   onUpdated?: (result: LifecycleResult) => void;
 }) {
   const router = useRouter();
@@ -96,9 +142,13 @@ export default function DeliveryLifecycleActions({
   const [error, setError] = useState<string | null>(null);
   const [selectedKnightId, setSelectedKnightId] = useState(delivery.knight_id ?? "");
   const [customKnightName, setCustomKnightName] = useState(delivery.knight_id ? "" : delivery.knight_name ?? "");
-  const [pickupAt, setPickupAt] = useState(toInputValue(delivery.app_order?.pickup_scheduled_at));
-  const [deliveryAt, setDeliveryAt] = useState(toInputValue(delivery.app_order?.delivery_scheduled_at));
-  const [minPickupAt, setMinPickupAt] = useState(nowInputValue);
+  const [pickupAt, setPickupAt] = useState(
+    toDatetimeLocalValue(delivery.app_order?.pickup_scheduled_at, delivery.task_date),
+  );
+  const [deliveryAt, setDeliveryAt] = useState(
+    toDatetimeLocalValue(delivery.app_order?.delivery_scheduled_at, delivery.task_date),
+  );
+  const [minPickupAt, setMinPickupAt] = useState(nowDatetimeLocalInput);
 
   const appStatus = delivery.app_order?.status ?? (delivery.app_order_id ? "registered" : null);
   const appRank = statusRank[appStatus ?? ""] ?? 0;
@@ -111,6 +161,14 @@ export default function DeliveryLifecycleActions({
     if (!selectedKnightId) return customKnightName.trim();
     return knights.find((knight) => knight.id === selectedKnightId)?.display_name ?? customKnightName.trim();
   }, [customKnightName, knights, selectedKnightId]);
+
+  const assignLabel = needsAssignmentConfirmation
+    ? compact
+      ? "Assign & start"
+      : "Assign knight & start"
+    : compact
+      ? "Assign"
+      : "Assign knight";
 
   async function run(payload: ActionPayload) {
     setBusyAction(payload.action);
@@ -141,23 +199,52 @@ export default function DeliveryLifecycleActions({
 
   function openAssignment() {
     setError(null);
-    setMinPickupAt(nowInputValue());
+    setMinPickupAt(nowDatetimeLocalInput());
+    setSelectedKnightId(delivery.knight_id ?? "");
+    setCustomKnightName(delivery.knight_id ? "" : (delivery.knight_name ?? ""));
+
+    const defaults = defaultScheduleTimes();
+    const taskDate = delivery.task_date ?? null;
+    setPickupAt(
+      resolveScheduleInput(
+        delivery.app_order?.pickup_scheduled_at,
+        delivery.pickup_time_window,
+        taskDate,
+        defaults.pickup,
+      ),
+    );
+    setDeliveryAt(
+      resolveScheduleInput(
+        delivery.app_order?.delivery_scheduled_at,
+        delivery.drop_time_window,
+        taskDate,
+        defaults.drop,
+      ),
+    );
     setAssignOpen(true);
   }
 
   function submitAssignment() {
-    const currentMinute = nowInputValue();
+    const currentMinute = nowDatetimeLocalInput();
     setMinPickupAt(currentMinute);
 
     if (!selectedKnightName) {
       setError("Choose a knight or enter a provider name");
       return;
     }
-    if (pickupAt && pickupAt < currentMinute) {
+    if (pickupAt && variant !== "running" && isScheduleInputBeforeNow(pickupAt)) {
       setError("Pickup time cannot be earlier than the current time.");
       return;
     }
-    if (pickupAt && deliveryAt && deliveryAt < pickupAt) {
+    if (pickupAt && !isWithinWorkingHours(pickupAt)) {
+      setError(workingHoursError());
+      return;
+    }
+    if (deliveryAt && !isWithinWorkingHours(deliveryAt)) {
+      setError(workingHoursError());
+      return;
+    }
+    if (pickupAt && deliveryAt && isScheduleInputBefore(deliveryAt, pickupAt)) {
       setError("Delivery time cannot be earlier than pickup time.");
       return;
     }
@@ -166,143 +253,219 @@ export default function DeliveryLifecycleActions({
       action: "assign",
       knight_id: selectedKnightId || null,
       knight_name: selectedKnightName,
-      pickup_scheduled_at: toIso(pickupAt),
-      delivery_scheduled_at: toIso(deliveryAt),
+      pickup_scheduled_at: scheduleInputToIso(pickupAt),
+      delivery_scheduled_at: scheduleInputToIso(deliveryAt),
     });
   }
 
+  const isPickedUp = delivery.fulfillment_status === "active";
+  const compactBtnSx = compact
+    ? { px: 1, minWidth: 0, fontSize: "0.8125rem", whiteSpace: "nowrap" as const }
+    : undefined;
+
   return (
-    <div className={compact ? "min-w-[11rem]" : "min-w-[13rem]"}>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={`btn ${needsAssignmentConfirmation ? "btn-primary" : "btn-secondary"} px-2 py-1 text-xs`}
-          disabled={busyAction !== null || isCancelled}
-          onClick={openAssignment}
-        >
-          {needsAssignmentConfirmation
-            ? compact
-              ? "Assign & start"
-              : "Assign knight & start"
-            : compact
-              ? "Assign"
-              : "Assign knight"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary px-2 py-1 text-xs"
-          disabled={busyAction !== null || isCancelled}
-          onClick={() => run({ action: "pickup" })}
-        >
-          {busyAction === "pickup" ? "Saving..." : "Pickup"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary px-2 py-1 text-xs"
-          disabled={busyAction !== null || isCancelled}
-          onClick={() => run({ action: "deliver" })}
-        >
-          {busyAction === "deliver" ? "Saving..." : "Delivered"}
-        </button>
-      </div>
+    <Box sx={compact ? { width: "100%" } : { minWidth: 168 }}>
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          flexWrap: "nowrap",
+          justifyContent: compact ? "flex-end" : "flex-start",
+          gap: 0.5,
+        }}
+      >
+        {variant === "pending" ? (
+          <Button
+            size="small"
+            variant={needsAssignmentConfirmation ? "contained" : "outlined"}
+            disabled={busyAction !== null || isCancelled}
+            onClick={openAssignment}
+            sx={compactBtnSx}
+          >
+            {assignLabel}
+          </Button>
+        ) : null}
 
-      {error ? <div className="mt-2 text-xs text-[#b42318]">{error}</div> : null}
-
-      {assignOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="card w-full max-w-md bg-white p-5 shadow-xl">
-            <div className="mb-4">
-              <h2 className="text-base font-bold">
-                {needsAssignmentConfirmation ? "Assign knight and start delivery" : "Assign knight and time"}
-              </h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                {needsAssignmentConfirmation
-                  ? "Choose who will handle this delivery. This confirms the booking and starts delivery in the app."
-                  : "Update the delivery assignment and timing."}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="label">Knight</label>
-                <select
-                  className="select"
-                  value={selectedKnightId}
-                  onChange={(event) => {
-                    setSelectedKnightId(event.target.value);
-                    if (event.target.value) setCustomKnightName("");
-                  }}
-                >
-                  <option value="">Custom / external provider</option>
-                  {knights.map((knight) => (
-                    <option key={knight.id} value={knight.id}>
-                      {knight.display_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {!selectedKnightId ? (
-                <div>
-                  <label className="label">Provider name</label>
-                  <input
-                    className="input"
-                    value={customKnightName}
-                    onChange={(event) => setCustomKnightName(event.target.value)}
-                    placeholder="Type knight, vendor, or self"
-                  />
-                </div>
-              ) : null}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Pickup time</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={pickupAt}
-                    min={minPickupAt}
-                    onChange={(event) => setPickupAt(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label">Delivery time</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={deliveryAt}
-                    min={pickupAt || minPickupAt}
-                    onChange={(event) => setDeliveryAt(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={busyAction !== null}
-                onClick={() => setAssignOpen(false)}
+        {variant === "running" ? (
+          <>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={busyAction !== null || isCancelled}
+              onClick={openAssignment}
+              sx={compactBtnSx}
+            >
+              Edit
+            </Button>
+            {isPickedUp ? (
+              <Button
+                size="small"
+                variant="contained"
+                disabled={busyAction !== null || isCancelled}
+                onClick={() => run({ action: "deliver" })}
+                sx={compactBtnSx}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={busyAction !== null || !selectedKnightName}
-                onClick={submitAssignment}
+                {busyAction === "deliver" ? "…" : "Done"}
+              </Button>
+            ) : (
+              <Button
+                size="small"
+                variant="contained"
+                disabled={busyAction !== null || isCancelled}
+                onClick={() => run({ action: "pickup" })}
+                sx={compactBtnSx}
               >
-                {busyAction === "assign"
-                  ? "Assigning..."
-                  : needsAssignmentConfirmation
-                    ? "Assign and start"
-                    : "Assign and sync"}
-              </button>
-            </div>
-          </div>
-        </div>
+                {busyAction === "pickup" ? "…" : "Pickup"}
+              </Button>
+            )}
+          </>
+        ) : null}
+
+        {variant === "default" ? (
+          <>
+            <Button
+              size="small"
+              variant={needsAssignmentConfirmation ? "contained" : "outlined"}
+              disabled={busyAction !== null || isCancelled}
+              onClick={openAssignment}
+              sx={compactBtnSx}
+            >
+              {assignLabel}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={busyAction !== null || isCancelled}
+              onClick={() => run({ action: "pickup" })}
+              sx={compactBtnSx}
+            >
+              {busyAction === "pickup" ? "…" : "Pickup"}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={busyAction !== null || isCancelled}
+              onClick={() => run({ action: "deliver" })}
+              sx={compactBtnSx}
+            >
+              {busyAction === "deliver" ? "…" : compact ? "Done" : "Delivered"}
+            </Button>
+          </>
+        ) : null}
+      </Stack>
+
+      {error && !assignOpen ? (
+        <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.75 }}>
+          {error}
+        </Typography>
       ) : null}
-    </div>
+
+      <Dialog open={assignOpen} onClose={() => setAssignOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ pr: 6 }}>
+          {variant === "running"
+            ? "Edit assignment"
+            : needsAssignmentConfirmation
+              ? "Assign knight and start delivery"
+              : "Assign knight and time"}
+        </DialogTitle>
+        <DialogContent dividers sx={{ pt: 2 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+            {variant === "running"
+              ? "Change the knight or scheduled pickup/delivery times."
+              : needsAssignmentConfirmation
+                ? "Choose who will handle this delivery. This confirms the booking and starts delivery in the app."
+                : "Update the delivery assignment and timing."}
+          </Typography>
+
+          {error ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          ) : null}
+
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mb: 0.5, display: "block" }}>
+                Knight
+              </Typography>
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={selectedKnightId}
+                renderValue={(value) => {
+                  if (!value) return "Custom / external provider";
+                  return knights.find((knight) => knight.id === value)?.display_name ?? "Knight";
+                }}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setSelectedKnightId(next);
+                  if (next) {
+                    setCustomKnightName("");
+                  } else {
+                    setCustomKnightName(
+                      (prev) => prev.trim() || delivery.knight_name?.trim() || "",
+                    );
+                  }
+                }}
+              >
+                <MenuItem value="">Custom / external provider</MenuItem>
+                {knights.map((knight) => (
+                  <MenuItem key={knight.id} value={knight.id}>
+                    {knight.display_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </Box>
+
+            {!selectedKnightId ? (
+              <TextField
+                size="small"
+                fullWidth
+                required
+                label="Provider name"
+                value={customKnightName}
+                onChange={(e) => setCustomKnightName(e.target.value)}
+                placeholder="e.g. WeFast, Uber, self, or knight name"
+                helperText="Required for external / third-party providers"
+              />
+            ) : null}
+
+            <ScheduleDateTimeField
+              label="Pickup scheduled"
+              value={pickupAt}
+              min={minPickupAt}
+              onChange={setPickupAt}
+              helperText="When the partner should collect the parcel"
+            />
+            <ScheduleDateTimeField
+              label="Delivery scheduled"
+              value={deliveryAt}
+              min={pickupAt || minPickupAt}
+              onChange={setDeliveryAt}
+              helperText="Expected drop-off time"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button variant="outlined" disabled={busyAction !== null} onClick={() => setAssignOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={busyAction !== null || !selectedKnightName}
+            onClick={submitAssignment}
+          >
+            {busyAction === "assign"
+              ? "Saving…"
+              : variant === "running"
+                ? "Save"
+                : needsAssignmentConfirmation
+                  ? "Assign and start"
+                  : "Assign and sync"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

@@ -49,7 +49,7 @@ export default async function KnightDetailPage({
           <SalaryForm knightId={id} />
         </div>
         {sals.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No salary records yet.</p>
+          <p className="text-sm text-[var(--muted-foreground)]">No salary records yet.</p>
         ) : (
           <table className="data">
             <thead>

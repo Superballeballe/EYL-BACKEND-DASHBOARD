@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
+import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
 import { sendOrderAssignedNotification } from "@/lib/server/expoPush";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -59,6 +60,9 @@ function validateScheduleTimes(pickupIso: string | null | undefined, deliveryIso
   if (pickupAt && deliveryAt && deliveryAt < pickupAt) {
     return "Delivery time cannot be earlier than pickup time.";
   }
+
+  if (pickupIso && !isWithinWorkingHours(pickupIso)) return workingHoursError();
+  if (deliveryIso && !isWithinWorkingHours(deliveryIso)) return workingHoursError();
 
   return null;
 }
@@ -126,8 +130,8 @@ function legacyOrderStatus(status: unknown) {
 }
 
 function assignmentOrderStatus(fulfillmentStatus: string | null | undefined) {
-  if (fulfillmentStatus === "delivered") return "delivered";
-  if (fulfillmentStatus === "picked_up") return "picked_up";
+  if (fulfillmentStatus === "completed") return "delivered";
+  if (fulfillmentStatus === "active") return "picked_up";
   if (fulfillmentStatus === "cancelled") return "cancelled";
   return "rider_assigned";
 }
@@ -196,8 +200,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
       deliveryPatch.knight_id = action.knight_id ?? null;
       deliveryPatch.knight_name = knightName;
       deliveryPatch.assignment_status = "assigned";
-      if (!["picked_up", "delivered", "cancelled"].includes(linkedDelivery.fulfillment_status ?? "")) {
-        deliveryPatch.fulfillment_status = "in_transit";
+      if (!["active", "completed", "cancelled"].includes(linkedDelivery.fulfillment_status ?? "")) {
+        deliveryPatch.fulfillment_status = "accepted";
       }
       deliveryPatch.pickup_time_window = scheduleLabel(action.pickup_scheduled_at);
       deliveryPatch.drop_time_window = scheduleLabel(action.delivery_scheduled_at);
@@ -213,11 +217,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
       orderPatch.pickup_scheduled_at = action.pickup_scheduled_at ?? null;
       orderPatch.delivery_scheduled_at = action.delivery_scheduled_at ?? null;
     } else if (action.action === "pickup") {
-      deliveryPatch.fulfillment_status = "picked_up";
+      deliveryPatch.fulfillment_status = "active";
       deliveryPatch.pickup_actual_time = nowClock();
       orderPatch.status = "picked_up";
     } else if (action.action === "deliver") {
-      deliveryPatch.fulfillment_status = "delivered";
+      deliveryPatch.fulfillment_status = "completed";
       deliveryPatch.drop_actual_time = nowClock();
       orderPatch.status = "delivered";
     } else if (action.action === "cancel") {

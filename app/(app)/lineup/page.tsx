@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/ui";
 import LineupEditor from "@/components/LineupEditor";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { todayISO } from "@/lib/format";
@@ -19,8 +18,7 @@ export default async function LineupPage({
     .order("display_name");
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader title="Daily Lineup" subtitle="Who is working, where, and their shift" />
+    <div>
       <LineupEditor knights={data ?? []} initialDate={date} />
     </div>
   );

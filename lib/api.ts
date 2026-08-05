@@ -17,6 +17,14 @@ export function notFound(message = "Not found") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
+export function unauthorized(message = "Unauthorized") {
+  return NextResponse.json({ error: message }, { status: 401 });
+}
+
+export function forbidden(message = "Forbidden") {
+  return NextResponse.json({ error: message }, { status: 403 });
+}
+
 export function serverError(e: unknown) {
   const message = e instanceof Error ? e.message : "Internal server error";
   return NextResponse.json({ error: message }, { status: 500 });

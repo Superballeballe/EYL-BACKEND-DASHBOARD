@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deliveryUpdateSchema } from "@/lib/schemas";
 import { resolveKnight } from "@/lib/server/roster";
-import { notFound, ok, parseBody, serverError } from "@/lib/api";
+import { badRequest, forbidden, notFound, ok, parseBody, serverError, unauthorized } from "@/lib/api";
+import { requireAdmin } from "@/lib/server/session";
 
 export const runtime = "nodejs";
 
@@ -45,11 +46,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   try {
+    await requireAdmin();
     const { id } = await params;
     const { error } = await supabaseAdmin().from("deliveries").delete().eq("id", id);
     if (error) return serverError(error);
     return ok({ ok: true });
   } catch (e) {
+    if (e instanceof Error && e.message === "UNAUTHORIZED") return unauthorized("Sign in required");
+    if (e instanceof Error && e.message === "FORBIDDEN") return forbidden("Admin access required");
     return serverError(e);
   }
 }

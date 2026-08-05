@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
 
 // ---- shared field helpers (transform-based so types infer cleanly) ---------
 function blankToNull(v: unknown): unknown {
@@ -58,12 +59,20 @@ const roleField = z.any().transform((v): "walker" | "biker" | null => {
 const assignmentStatusField = z.any().transform((v): "assigned" | "cancelled" =>
   String(v ?? "").trim().toLowerCase() === "cancelled" ? "cancelled" : "assigned",
 );
+// Legacy values (pre-rename) map onto the current booked/accepted/active/completed vocabulary.
+// Note the reordering: assigning a knight used to write "in_transit" and now writes "accepted";
+// the explicit pickup action used to write "picked_up" and now writes "active".
+const LEGACY_FULFILLMENT_STATUS: Record<string, "booked" | "accepted" | "active" | "completed"> = {
+  placed: "booked",
+  in_transit: "accepted",
+  picked_up: "active",
+  delivered: "completed",
+};
 const fulfillmentStatusField = z.any().transform(
-  (v): "placed" | "picked_up" | "in_transit" | "delivered" | "cancelled" => {
+  (v): "booked" | "accepted" | "active" | "completed" | "cancelled" => {
     const s = String(v ?? "").trim().toLowerCase().replace(/[\s-]/g, "_");
-    return s === "picked_up" || s === "in_transit" || s === "delivered" || s === "cancelled"
-      ? (s as "picked_up" | "in_transit" | "delivered" | "cancelled")
-      : "placed";
+    if (s === "accepted" || s === "active" || s === "completed" || s === "cancelled") return s;
+    return LEGACY_FULFILLMENT_STATUS[s] ?? "booked";
   },
 );
 const lineupStatusField = z.any().transform((v): "working" | "leave" | "half_day" => {
@@ -92,11 +101,16 @@ export const deliverySchema = z.object({
   sender_last_name: nstr,
 
   pickup_location: nstr,
+  pickup_lat: nnum,
+  pickup_lng: nnum,
   pickup_time_window: nstr,
   pickup_actual_time: nstr,
 
   drop_location: nstr,
+  drop_lat: nnum,
+  drop_lng: nnum,
   drop_recipient_name: nstr,
+  recipient_phone: nstr,
   drop_time_window: nstr,
   drop_actual_time: nstr,
 
@@ -127,6 +141,81 @@ export const deliverySchema = z.object({
 
   needs_review: z.boolean().optional(),
 });
+
+export const createDeliverySchema = deliverySchema.superRefine((data, ctx) => {
+  if (data.task_date == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Task date is required", path: ["task_date"] });
+  }
+  if (data.booking_date == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Booking date is required", path: ["booking_date"] });
+  }
+  if (data.mode_of_booking == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Mode of booking is required", path: ["mode_of_booking"] });
+  }
+  if (data.serial_no == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Serial number is required", path: ["serial_no"] });
+  }
+  if (data.sender_name == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Sender name is required", path: ["sender_name"] });
+  }
+  if (data.pickup_location == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pickup location is required", path: ["pickup_location"] });
+  }
+  if (data.pickup_time_window == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pickup time is required", path: ["pickup_time_window"] });
+  } else if (!isWithinWorkingHours(data.pickup_time_window)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["pickup_time_window"] });
+  }
+  if (data.drop_location == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Drop location is required", path: ["drop_location"] });
+  }
+  if (data.drop_time_window == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Drop time is required", path: ["drop_time_window"] });
+  } else if (!isWithinWorkingHours(data.drop_time_window)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["drop_time_window"] });
+  }
+  if (data.drop_recipient_name == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Recipient name is required", path: ["drop_recipient_name"] });
+  }
+  if (data.recipient_phone == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Phone number is required", path: ["recipient_phone"] });
+  }
+  if (data.pickup_actual_time == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pickup actual time is required", path: ["pickup_actual_time"] });
+  } else if (!isWithinWorkingHours(data.pickup_actual_time)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["pickup_actual_time"] });
+  }
+  if (data.drop_actual_time == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Drop actual time is required", path: ["drop_actual_time"] });
+  } else if (!isWithinWorkingHours(data.drop_actual_time)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["drop_actual_time"] });
+  }
+  if (data.fulfillment_status == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Status is required", path: ["fulfillment_status"] });
+  }
+  if (data.fulfillment_status !== "cancelled" && data.knight_name == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Knight is required", path: ["knight_name"] });
+  }
+  if (data.working_hours == null && data.fulfillment_status !== "cancelled") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Working hours could not be calculated", path: ["working_hours"] });
+  }
+  if (data.fees == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Fees is required", path: ["fees"] });
+  }
+  if (data.kms == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Kms is required", path: ["kms"] });
+  }
+  if (data.payment_status == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Payment status is required", path: ["payment_status"] });
+  }
+  if (data.payment_mode == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Payment mode is required", path: ["payment_mode"] });
+  }
+  if (data.final_bill_amount == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Final bill amount is required", path: ["final_bill_amount"] });
+  }
+});
+
 export const deliveryUpdateSchema = deliverySchema.partial();
 export type DeliveryInput = z.infer<typeof deliverySchema>;
 

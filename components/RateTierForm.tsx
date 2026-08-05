@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Box,
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+} from "@mui/material";
 
 const PROVIDERS = ["eyl", "eyl_cake", "fudpro", "wefast", "uber", "porter"];
 
-export default function RateTierForm() {
+export default function RateTierForm({ onSuccess }: { onSuccess?: () => void }) {
   const router = useRouter();
   const [v, setV] = useState({
     provider: "eyl",
@@ -20,7 +31,7 @@ export default function RateTierForm() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  function set(k: string, val: any) {
+  function set(k: string, val: string | boolean) {
     setV((s) => ({ ...s, [k]: val }));
   }
 
@@ -35,8 +46,18 @@ export default function RateTierForm() {
     });
     setBusy(false);
     if (res.ok) {
-      setV({ ...v, label: "", min_km: "", max_km: "", fee: "", fee_ex_gst: "", gst_amount: "" });
+      setV({
+        provider: v.provider,
+        label: "",
+        min_km: "",
+        max_km: "",
+        fee: "",
+        fee_ex_gst: "",
+        gst_amount: "",
+        is_current: true,
+      });
       router.refresh();
+      onSuccess?.();
     } else {
       const d = await res.json().catch(() => ({}));
       setErr(d.error || "Save failed");
@@ -44,39 +65,81 @@ export default function RateTierForm() {
   }
 
   return (
-    <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-      <div className="col-span-2">
-        <label className="label">Provider</label>
-        <select className="select" value={v.provider} onChange={(e) => set("provider", e.target.value)}>
-          {PROVIDERS.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
-      <div className="col-span-2">
-        <label className="label">Label</label>
-        <input className="input" value={v.label} onChange={(e) => set("label", e.target.value)} placeholder="0 kms - 3 kms" />
-      </div>
-      <div>
-        <label className="label">Min km</label>
-        <input type="number" step="0.1" className="input" value={v.min_km} onChange={(e) => set("min_km", e.target.value)} />
-      </div>
-      <div>
-        <label className="label">Max km</label>
-        <input type="number" step="0.1" className="input" value={v.max_km} onChange={(e) => set("max_km", e.target.value)} />
-      </div>
-      <div>
-        <label className="label">Fee (₹)</label>
-        <input type="number" step="0.01" className="input" value={v.fee} onChange={(e) => set("fee", e.target.value)} />
-      </div>
-      <div>
-        <label className="label">Fee ex-GST</label>
-        <input type="number" step="0.01" className="input" value={v.fee_ex_gst} onChange={(e) => set("fee_ex_gst", e.target.value)} />
-      </div>
-      {err && <p className="text-sm text-[#b42318] col-span-2">{err}</p>}
-      <div className="col-span-2">
-        <button className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Add tier"}</button>
-      </div>
-    </form>
+    <Box component="form" onSubmit={submit}>
+      <Stack spacing={2.5}>
+        <FormControl fullWidth size="small">
+          <InputLabel id="provider-label">Provider</InputLabel>
+          <Select
+            labelId="provider-label"
+            label="Provider"
+            value={v.provider}
+            onChange={(e) => set("provider", e.target.value)}
+          >
+            {PROVIDERS.map((p) => (
+              <MenuItem key={p} value={p}>
+                {p}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <TextField
+          size="small"
+          fullWidth
+          label="Label"
+          placeholder="e.g. 0 kms - 3 kms"
+          value={v.label}
+          onChange={(e) => set("label", e.target.value)}
+        />
+
+        <Stack direction="row" spacing={2}>
+          <TextField
+            size="small"
+            fullWidth
+            type="number"
+            label="Min km"
+            slotProps={{ htmlInput: { step: 0.1 } }}
+            value={v.min_km}
+            onChange={(e) => set("min_km", e.target.value)}
+          />
+          <TextField
+            size="small"
+            fullWidth
+            type="number"
+            label="Max km"
+            slotProps={{ htmlInput: { step: 0.1 } }}
+            value={v.max_km}
+            onChange={(e) => set("max_km", e.target.value)}
+          />
+        </Stack>
+
+        <Stack direction="row" spacing={2}>
+          <TextField
+            size="small"
+            fullWidth
+            type="number"
+            label="Fee (₹)"
+            slotProps={{ htmlInput: { step: 0.01 } }}
+            value={v.fee}
+            onChange={(e) => set("fee", e.target.value)}
+          />
+          <TextField
+            size="small"
+            fullWidth
+            type="number"
+            label="Fee ex-GST"
+            slotProps={{ htmlInput: { step: 0.01 } }}
+            value={v.fee_ex_gst}
+            onChange={(e) => set("fee_ex_gst", e.target.value)}
+          />
+        </Stack>
+
+        {err ? <Alert severity="error">{err}</Alert> : null}
+
+        <Button type="submit" variant="contained" disabled={busy} fullWidth>
+          {busy ? "Saving…" : "+ Add tier"}
+        </Button>
+      </Stack>
+    </Box>
   );
 }

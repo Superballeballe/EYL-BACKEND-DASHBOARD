@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { deliverySchema } from "@/lib/schemas";
+import { deliverySchema, createDeliverySchema } from "@/lib/schemas";
 import { resolveKnight } from "@/lib/server/roster";
+import { nextSerial } from "@/lib/server/serial";
+import { nextInvoiceNo } from "@/lib/server/invoice";
 import { created, ok, parseBody, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -61,15 +63,20 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const parsed = await parseBody(req, deliverySchema);
+  const parsed = await parseBody(req, createDeliverySchema);
   if ("error" in parsed) return parsed.error;
   try {
-    const row = await resolveKnight(parsed.data);
-    const { data, error } = await supabaseAdmin()
-      .from("deliveries")
-      .insert(row)
-      .select()
-      .single();
+    const db = supabaseAdmin();
+    let row = await resolveKnight(parsed.data);
+    if (row.serial_no == null) {
+      const serial = await nextSerial(db, row.mode_of_booking);
+      row = { ...row, serial_no: serial.serial_no };
+    }
+    if (!row.invoice_no?.trim()) {
+      const invoice = await nextInvoiceNo(db);
+      row = { ...row, invoice_no: invoice.invoice_no };
+    }
+    const { data, error } = await db.from("deliveries").insert(row).select().single();
     if (error) return serverError(error);
     return created(data);
   } catch (e) {

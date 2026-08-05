@@ -1,43 +1,50 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, SESSION_MAX_AGE, createSessionToken } from "@/lib/auth";
+import { z } from "zod";
+import { badRequest, serverError, unauthorized } from "@/lib/api";
+import { verifyPassword } from "@/lib/password";
+import { countDashboardUsers, getUserWithPassword, issueSessionResponse } from "@/lib/server/session";
 
 export const runtime = "nodejs";
 
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export async function POST(req: Request) {
-  let password = "";
-  try {
-    const body = await req.json();
-    password = String(body?.password ?? "");
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await req.json().catch(() => null);
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) return badRequest("Email and password are required");
 
-  const expected = process.env.APP_PASSWORD;
   const secret = process.env.SESSION_SECRET || "";
-  if (!expected || !secret) {
-    return NextResponse.json(
-      { error: "Server auth is not configured (APP_PASSWORD / SESSION_SECRET)." },
-      { status: 500 },
-    );
-  }
-  if (password !== expected) {
-    return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+  if (!secret) {
+    return NextResponse.json({ error: "SESSION_SECRET is not configured" }, { status: 500 });
   }
 
-  // Mark Secure only when actually served over HTTPS, so self-hosting over
-  // plain http://<lan-ip> still works (a Secure cookie wouldn't be stored there).
-  const isHttps =
-    new URL(req.url).protocol === "https:" ||
-    req.headers.get("x-forwarded-proto") === "https";
+  try {
+    const count = await countDashboardUsers();
+    if (count === 0) {
+      return NextResponse.json({ error: "Setup required", setupRequired: true }, { status: 403 });
+    }
 
-  const token = await createSessionToken(secret);
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isHttps,
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
-  return res;
+    const row = await getUserWithPassword(parsed.data.email);
+    if (!row || !row.active) return unauthorized("Incorrect email or password");
+
+    const valid = await verifyPassword(parsed.data.password, row.password_hash);
+    if (!valid) return unauthorized("Incorrect email or password");
+
+    if (!row.email_verified_at) {
+      return NextResponse.json(
+        { error: "Confirm your email before signing in.", emailNotVerified: true },
+        { status: 403 },
+      );
+    }
+
+    return issueSessionResponse(req, row.id, {
+      ok: true,
+      user: { id: row.id, email: row.email, name: row.name, role: row.role },
+    });
+  } catch (e) {
+    return serverError(e);
+  }
 }
