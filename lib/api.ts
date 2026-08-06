@@ -26,7 +26,12 @@ export function forbidden(message = "Forbidden") {
 }
 
 export function serverError(e: unknown) {
-  const message = e instanceof Error ? e.message : "Internal server error";
+  let message = "Internal server error";
+  if (e instanceof Error) {
+    message = e.message;
+  } else if (e && typeof e === "object" && "message" in e && typeof e.message === "string") {
+    message = e.message;
+  }
   return NextResponse.json({ error: message }, { status: 500 });
 }
 

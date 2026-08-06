@@ -78,6 +78,18 @@ export type RateTier = {
   updated_at: string;
 };
 
+export type MonthlyCoupon = {
+  id: string;
+  year_month: string;
+  code: string;
+  type: "percent" | "flat";
+  value: number;
+  label: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Delivery = {
   id: string;
   app_order_id: string | null;

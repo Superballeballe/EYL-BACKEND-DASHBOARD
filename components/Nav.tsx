@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
@@ -39,6 +40,7 @@ const LINKS = [
   { href: "/salaries", label: "Salaries", Icon: BadgeOutlinedIcon },
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
+  { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
 ] as const;
 
 const ADMIN_LINKS = [{ href: "/admin/users", label: "Team", Icon: ManageAccountsOutlinedIcon }] as const;
