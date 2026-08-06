@@ -83,6 +83,31 @@ function datetimeToEpochMinutes(raw: string): number | null {
   return d.getTime() / 60_000;
 }
 
+/** Business timezone for scheduled pickup/delivery times. */
+export const BUSINESS_TZ = "Asia/Kolkata";
+
+function wallClockInBusinessTz(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: BUSINESS_TZ,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/** Parse `datetime-local` wall clock as an instant in BUSINESS_TZ. */
+function businessWallClockToDate(value: string): Date | null {
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/);
+  if (!m) return null;
+  const d = new Date(`${m[1]}T${m[2]}:00+05:30`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** Normalize stored text/ISO to `datetime-local` value (`YYYY-MM-DDTHH:mm`). */
 export function toDatetimeLocalValue(
   value: string | null | undefined,
@@ -90,14 +115,10 @@ export function toDatetimeLocalValue(
 ): string {
   const s = String(value ?? "").trim();
   if (!s) return "";
-  const dtl = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-  if (dtl) return `${dtl[1]}T${dtl[2]}`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return s;
   if (s.includes("T") || s.endsWith("Z")) {
     const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) {
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
+    if (!Number.isNaN(d.getTime())) return wallClockInBusinessTz(d);
   }
   const hm = s.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?$/i);
   const date = fallbackDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? fallbackDate : null;
@@ -143,16 +164,14 @@ export function toDatetimeLocalValue(
 export function scheduleInputToDate(value: string | null | undefined): Date | null {
   const v = toDatetimeLocalValue(value);
   if (!v) return null;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? null : d;
+  return businessWallClockToDate(v);
 }
 
 export function nowDatetimeLocalInput(): string {
   const d = new Date();
   d.setSeconds(0, 0);
   d.setMilliseconds(0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return wallClockInBusinessTz(d);
 }
 
 export function isScheduleInputBeforeNow(value: string | null | undefined): boolean {
