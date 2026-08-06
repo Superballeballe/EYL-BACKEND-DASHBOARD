@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminUsersBoard from "@/components/AdminUsersBoard";
-import { getSessionUser, listDashboardUsers } from "@/lib/server/session";
+import { getSessionUser, listDashboardUsers, listPendingInvites } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export default async function AdminUsersPage() {
   if (!user) redirect("/login");
   if (user.role !== "admin") redirect("/");
 
-  const users = await listDashboardUsers();
+  const [users, invites] = await Promise.all([listDashboardUsers(), listPendingInvites()]);
 
-  return <AdminUsersBoard initialUsers={users} currentUserId={user.id} />;
+  return <AdminUsersBoard initialUsers={users} initialInvites={invites} currentUserId={user.id} />;
 }

@@ -7,6 +7,7 @@ import {
   getPendingInviteByEmail,
   getUserByEmail,
   listDashboardUsers,
+  listPendingInvites,
   requireAdmin,
 } from "@/lib/server/session";
 
@@ -20,8 +21,8 @@ const inviteSchema = z.object({
 export async function GET() {
   try {
     await requireAdmin();
-    const users = await listDashboardUsers();
-    return ok({ users });
+    const [users, invites] = await Promise.all([listDashboardUsers(), listPendingInvites()]);
+    return ok({ users, invites });
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") return unauthorized("Sign in required");
     if (e instanceof Error && e.message === "FORBIDDEN") return forbidden("Admin access required");

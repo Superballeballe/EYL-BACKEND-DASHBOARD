@@ -92,7 +92,20 @@ export async function sendResendEmail(input: ResendEmail & { text?: string }): P
 
 export function appUrl(req: Request, path: string): string {
   const configured = process.env.APP_URL?.replace(/\/$/, "");
-  const base = configured || new URL(req.url).origin;
+  const isLocalConfigured =
+    !configured || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configured);
+
+  let base: string;
+  if (!isLocalConfigured && configured) {
+    base = configured;
+  } else {
+    const proto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const host =
+      req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ??
+      req.headers.get("host")?.trim();
+    base = proto && host ? `${proto}://${host}` : new URL(req.url).origin;
+  }
+
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 

@@ -134,6 +134,46 @@ export async function getPendingInviteByEmail(email: string) {
   return data;
 }
 
+export type DashboardInvite = {
+  id: string;
+  email: string;
+  role: DashboardRole;
+  expires_at: string;
+  created_at: string;
+  invited_by: string;
+};
+
+export async function listPendingInvites(): Promise<DashboardInvite[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("dashboard_invites")
+    .select("id, email, role, expires_at, created_at, invited_by")
+    .is("accepted_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DashboardInvite[];
+}
+
+export async function getPendingInviteById(id: string): Promise<DashboardInvite | null> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("dashboard_invites")
+    .select("id, email, role, expires_at, created_at, invited_by")
+    .eq("id", id)
+    .is("accepted_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DashboardInvite | null) ?? null;
+}
+
+export async function deleteInvite(id: string) {
+  const db = supabaseAdmin();
+  const { error } = await db.from("dashboard_invites").delete().eq("id", id).is("accepted_at", null);
+  if (error) throw error;
+}
+
 export async function updatePasswordHash(userId: string, passwordHash: string) {
   const db = supabaseAdmin();
   const { error } = await db.from("dashboard_users").update({ password_hash: passwordHash }).eq("id", userId);
