@@ -79,7 +79,7 @@ export default function NewDeliveryButton({
   async function handleCreate() {
     const result = await formRef.current?.validateAllSteps();
     if (!result?.ok) {
-      if (result.firstInvalidStep != null) setStep(result.firstInvalidStep);
+      if (result?.firstInvalidStep != null) setStep(result.firstInvalidStep);
       return;
     }
     document.getElementById(FORM_ID)?.requestSubmit();
