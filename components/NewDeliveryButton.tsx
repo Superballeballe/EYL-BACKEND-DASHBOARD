@@ -82,7 +82,8 @@ export default function NewDeliveryButton({
       if (result?.firstInvalidStep != null) setStep(result.firstInvalidStep);
       return;
     }
-    document.getElementById(FORM_ID)?.requestSubmit();
+    const form = document.getElementById(FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
   }
 
   return (
