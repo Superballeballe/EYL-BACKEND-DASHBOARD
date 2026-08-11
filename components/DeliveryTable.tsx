@@ -214,7 +214,7 @@ function previewLifecycleVariant(
   return null;
 }
 
-function DeliveryPreviewModal({
+export function DeliveryPreviewModal({
   delivery,
   knights,
   clients,

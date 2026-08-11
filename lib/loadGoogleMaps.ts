@@ -36,7 +36,7 @@ export function loadGoogleMaps(): Promise<void> {
       window.gm_authFailure = () => {
         fail(
           "BLOCKED",
-          "Google Maps blocked this API key (ApiTargetBlockedMapError). Enable Maps JavaScript, Directions, Geocoding, and Places APIs, and allow this site in your key’s HTTP referrer restrictions.",
+          "Google Maps blocked this API key (ApiTargetBlockedMapError). Enable Maps JavaScript, Places API (New), Directions, and Geocoding, and allow this site in your key’s HTTP referrer restrictions.",
         );
       };
 

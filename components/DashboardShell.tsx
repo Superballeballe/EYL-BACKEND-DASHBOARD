@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   Box,
   Card,
@@ -20,8 +19,10 @@ import {
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
+import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
 import { fmtDatetimeLocal, money, routeAreaLabel } from "@/lib/format";
@@ -30,6 +31,14 @@ import { gray, tableShellSx } from "@/lib/surface";
 import type { Delivery, WorkDay } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
+type ClientOpt = {
+  id: string;
+  client_name: string;
+  company_name: string | null;
+  gst_no: string | null;
+  address: string | null;
+};
+type RateTierOpt = { min_km: number | null; max_km: number | null; fee: number | null };
 
 type Period = {
   count: number;
@@ -51,6 +60,9 @@ type Props = {
   pendingOrders: Delivery[];
   runningOrders: Delivery[];
   knights: KnightOpt[];
+  clients: ClientOpt[];
+  rateTiers: RateTierOpt[];
+  isAdmin?: boolean;
   charts: ChartBundle;
 };
 
@@ -67,11 +79,13 @@ function OrdersTable({
   knights,
   emptyMessage,
   mode = "running",
+  onPreview,
 }: {
   rows: Delivery[];
   knights: KnightOpt[];
   emptyMessage: string;
   mode?: "pending" | "running";
+  onPreview: (delivery: Delivery) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -109,17 +123,28 @@ function OrdersTable({
         </TableHead>
         <TableBody>
           {rows.map((d) => (
-            <TableRow key={d.id} hover sx={ROW_ACCENT[d.fulfillment_status] ?? undefined}>
+            <TableRow
+              key={d.id}
+              hover
+              tabIndex={0}
+              role="button"
+              aria-label={`Preview delivery for ${d.sender_name ?? "unknown sender"}`}
+              sx={{
+                cursor: "pointer",
+                "&:focus-visible": { bgcolor: "#eff6ff" },
+                ...(ROW_ACCENT[d.fulfillment_status] ?? {}),
+              }}
+              onClick={() => onPreview(d)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                onPreview(d);
+              }}
+            >
               <TableCell sx={{ verticalAlign: "top", py: 1.25 }}>
                 {mode === "pending" ? (
                   <>
-                    <Typography
-                      component={Link}
-                      href={`/deliveries/${d.id}/edit`}
-                      variant="body2"
-                      color="primary"
-                      sx={{ fontWeight: 700, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
-                    >
+                    <Typography variant="body2" color="primary" sx={{ fontWeight: 700 }}>
                       {d.sender_name ?? "—"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.35 }}>
@@ -132,13 +157,7 @@ function OrdersTable({
                   </>
                 ) : (
                   <>
-                    <Typography
-                      component={Link}
-                      href={`/deliveries/${d.id}/edit`}
-                      variant="body2"
-                      color="primary"
-                      sx={{ fontWeight: 600, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
-                    >
+                    <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
                       {d.sender_name ?? "—"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.25 }}>
@@ -191,6 +210,7 @@ function OrdersPanel({
   knights,
   emptyMessage,
   mode = "running",
+  onPreview,
 }: {
   title: string;
   subtitle: string;
@@ -201,6 +221,7 @@ function OrdersPanel({
   knights: KnightOpt[];
   emptyMessage: string;
   mode?: "pending" | "running";
+  onPreview: (delivery: Delivery) => void;
 }) {
   return (
     <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -222,7 +243,13 @@ function OrdersPanel({
           <Chip variant="outlined" color="primary" label={`${count} ${countLabel}`} />
         </Stack>
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <OrdersTable rows={rows} knights={knights} emptyMessage={emptyMessage} mode={mode} />
+          <OrdersTable
+            rows={rows}
+            knights={knights}
+            emptyMessage={emptyMessage}
+            mode={mode}
+            onPreview={onPreview}
+          />
         </Box>
       </CardContent>
     </Card>
@@ -230,7 +257,9 @@ function OrdersPanel({
 }
 
 export default function DashboardShell(props: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState(0);
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const {
     viewDate,
     periodStart,
@@ -243,6 +272,9 @@ export default function DashboardShell(props: Props) {
     pendingOrders,
     runningOrders,
     knights,
+    clients,
+    rateTiers,
+    isAdmin = false,
     charts,
   } = props;
 
@@ -326,6 +358,7 @@ export default function DashboardShell(props: Props) {
                   knights={knights}
                   emptyMessage="No new jobs waiting for approval."
                   mode="pending"
+                  onPreview={setSelectedDelivery}
                 />
                 <OrdersPanel
                   title="Current running jobs"
@@ -337,6 +370,7 @@ export default function DashboardShell(props: Props) {
                   knights={knights}
                   emptyMessage="No jobs currently running."
                   mode="running"
+                  onPreview={setSelectedDelivery}
                 />
               </>
             )}
@@ -357,6 +391,25 @@ export default function DashboardShell(props: Props) {
           charts={charts}
         />
       )}
+
+      {selectedDelivery ? (
+        <DeliveryPreviewModal
+          delivery={selectedDelivery}
+          knights={knights}
+          clients={clients}
+          rateTiers={rateTiers}
+          isAdmin={isAdmin}
+          onClose={() => setSelectedDelivery(null)}
+          onSaved={(delivery) => {
+            setSelectedDelivery(delivery);
+            router.refresh();
+          }}
+          onDeleted={() => {
+            setSelectedDelivery(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </Box>
   );
 }

@@ -188,7 +188,7 @@ export default function PlottingMapBoard({
           {mapError ?? (
             <>
               Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your <code>.env</code> and enable Maps
-              JavaScript, Places, Directions, and Geocoding APIs in Google Cloud Console.
+              JavaScript, Places (New), Directions, and Geocoding APIs in Google Cloud Console.
             </>
           )}
         </Alert>
@@ -198,7 +198,8 @@ export default function PlottingMapBoard({
           </Typography>
           <Typography variant="body2" component="ul" sx={{ m: 0, pl: 2.5 }}>
             <li>Google Cloud → APIs &amp; Services → enable <strong>Maps JavaScript API</strong>,{" "}
-              <strong>Directions API</strong>, <strong>Geocoding API</strong>, <strong>Places API</strong>
+              <strong>Directions API</strong>, <strong>Geocoding API</strong>,{" "}
+              <strong>Places API (New)</strong>
             </li>
             <li>API key → Application restrictions → HTTP referrers → add{" "}
               <code>http://localhost:3000/*</code> and your production domain

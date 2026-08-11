@@ -26,7 +26,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Google Places dropdown above MUI dialogs */
+/* Places autocomplete list above MUI dialogs */
+.places-suggest,
 .pac-container {
   z-index: 1400 !important;
 }

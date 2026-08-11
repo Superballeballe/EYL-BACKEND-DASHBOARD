@@ -1,17 +1,28 @@
 declare namespace google.maps.places {
-  class Autocomplete {
-    constructor(input: HTMLInputElement, opts?: AutocompleteOptions);
-    addListener(event: string, fn: () => void): google.maps.MapsEventListener;
-    getPlace(): PlaceResult;
+  class AutocompleteSessionToken {}
+
+  class AutocompleteSuggestion {
+    placePrediction?: PlacePrediction;
+    static fetchAutocompleteSuggestions(
+      request: AutocompleteRequest,
+    ): Promise<{ suggestions: AutocompleteSuggestion[] }>;
   }
-  interface AutocompleteOptions {
-    componentRestrictions?: { country: string | string[] };
-    fields?: string[];
+
+  interface AutocompleteRequest {
+    input: string;
+    includedRegionCodes?: string[];
+    sessionToken?: AutocompleteSessionToken;
   }
-  interface PlaceResult {
-    formatted_address?: string;
-    name?: string;
-    geometry?: { location?: { lat(): number; lng(): number } };
+
+  interface PlacePrediction {
+    text?: { text?: string; toString(): string };
+    toPlace(): Place;
+  }
+
+  class Place {
+    formattedAddress?: string;
+    location?: { lat(): number; lng(): number };
+    fetchFields(opts: { fields: string[] }): Promise<void>;
   }
 }
 
@@ -22,6 +33,7 @@ declare namespace google.maps {
   enum SymbolPath {
     CIRCLE = 0,
   }
+  function importLibrary(name: string): Promise<unknown>;
   class Map {
     constructor(el: HTMLElement, opts: MapOptions);
     setCenter(pos: LatLngLiteral): void;

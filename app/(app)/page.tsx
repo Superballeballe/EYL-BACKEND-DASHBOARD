@@ -4,6 +4,7 @@ import DashboardShell from "@/components/DashboardShell";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getDeliveryFormOptions } from "@/lib/server/formOptions";
+import { getSessionUser } from "@/lib/server/session";
 import { fmtDate, todayISO } from "@/lib/format";
 import type { ChartBundle, MonthPoint } from "@/components/BusinessOverview";
 import type { Delivery, WorkDay } from "@/lib/types";
@@ -200,6 +201,7 @@ export default async function Dashboard() {
   const revenue = deliveries
     .filter((d) => d.assignment_status !== "cancelled")
     .reduce((s, d) => s + (d.fees ?? 0), 0);
+  const user = await getSessionUser();
 
   return (
     <div>
@@ -228,6 +230,9 @@ export default async function Dashboard() {
         pendingOrders={pendingOrders}
         runningOrders={runningOrders}
         knights={knights}
+        clients={clients}
+        rateTiers={rateTiers}
+        isAdmin={user?.role === "admin"}
         charts={charts}
       />
     </div>
