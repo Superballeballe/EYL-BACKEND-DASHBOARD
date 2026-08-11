@@ -25,6 +25,7 @@ import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/Del
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money, routeAreaLabel } from "@/lib/format";
 import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
+import { effectiveFulfillmentStatus } from "@/lib/deliveryStatus";
 import { tableShellSx } from "@/lib/surface";
 import type { Delivery } from "@/lib/types";
 
@@ -157,7 +158,7 @@ export default function DeliveryTable({
                   <Typography variant="body2">{delivery.knight_name ?? "—"}</Typography>
                 </TableCell>
                 <TableCell>
-                  <FulfillmentBadge status={delivery.fulfillment_status} />
+                  <FulfillmentBadge status={effectiveFulfillmentStatus(delivery)} />
                 </TableCell>
                 <TableCell sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                   {money(delivery.fees)}
@@ -301,7 +302,7 @@ export function DeliveryPreviewModal({
               <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
                 <Chip size="small" color="primary" variant="outlined" label={orderId} />
                 <Chip size="small" variant="outlined" label={source} />
-                <FulfillmentBadge status={delivery.fulfillment_status} />
+                <FulfillmentBadge status={effectiveFulfillmentStatus(delivery)} />
                 {delivery.needs_review ? (
                   <Chip size="small" color="warning" variant="outlined" label="Review" />
                 ) : null}
@@ -456,11 +457,13 @@ function DeliveryPreview({
           <div className="rounded-lg border border-[var(--border)] p-4">
             <div className="text-sm font-bold">Actions</div>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5, mb: 2 }}>
-              {actionVariant === "pending"
-                ? "Assign a knight to start this delivery."
-                : delivery.fulfillment_status === "active"
-                  ? "Mark done when delivered, or edit details."
-                  : "Mark pickup when collected, or edit details."}
+              {effectiveFulfillmentStatus(delivery) === "cancelled"
+                ? "This order was cancelled in the app — you cannot assign a knight."
+                : actionVariant === "pending"
+                  ? "Assign a knight to start this delivery."
+                  : delivery.fulfillment_status === "active"
+                    ? "Mark done when delivered, or edit details."
+                    : "Mark pickup when collected, or edit details."}
             </Typography>
             <DeliveryLifecycleActions
               delivery={delivery}

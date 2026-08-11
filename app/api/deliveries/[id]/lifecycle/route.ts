@@ -2,6 +2,7 @@ import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
 import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
 import { sendOrderAssignedNotification } from "@/lib/server/expoPush";
+import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -191,6 +192,18 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (action.action === "confirm") {
       return badRequest("Assign a knight before confirming the order.");
     } else if (action.action === "assign") {
+      if (linkedDelivery.app_order_id) {
+        const { data: appOrder, error: orderError } = await db
+          .from("orders")
+          .select("status")
+          .eq("id", linkedDelivery.app_order_id)
+          .maybeSingle();
+        if (orderError) return serverError(orderError);
+        if (isAppOrderCancelled(appOrder)) {
+          return badRequest("This app order was cancelled — restore it before assigning a knight.");
+        }
+      }
+
       const scheduleError = validateScheduleTimes(action.pickup_scheduled_at, action.delivery_scheduled_at);
       if (scheduleError) return badRequest(scheduleError);
 

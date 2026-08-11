@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import ScheduleDateTimeField from "@/components/ScheduleDateTimeField";
+import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import {
   isScheduleInputBefore,
   isScheduleInputBeforeNow,
@@ -155,7 +156,10 @@ export default function DeliveryLifecycleActions({
   const isAppOrder = Boolean(delivery.app_order_id);
   const hasKnight = Boolean(delivery.knight_name?.trim() || delivery.knight_id);
   const needsAssignmentConfirmation = isAppOrder && !hasKnight && appRank < statusRank.rider_assigned;
-  const isCancelled = appStatus === "cancelled" || delivery.fulfillment_status === "cancelled";
+  const isCancelled =
+    isAppOrderCancelled(delivery.app_order) || delivery.fulfillment_status === "cancelled";
+  const cancelledByApp =
+    isAppOrderCancelled(delivery.app_order) && delivery.fulfillment_status !== "cancelled";
 
   const selectedKnightName = useMemo(() => {
     if (!selectedKnightId) return customKnightName.trim();
@@ -357,6 +361,14 @@ export default function DeliveryLifecycleActions({
       {error && !assignOpen ? (
         <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.75 }}>
           {error}
+        </Typography>
+      ) : null}
+
+      {isCancelled && !assignOpen ? (
+        <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: "text.secondary" }}>
+          {cancelledByApp
+            ? "This app order was cancelled — assign is disabled until the order is restored in the app."
+            : "This delivery is cancelled."}
         </Typography>
       ) : null}
 

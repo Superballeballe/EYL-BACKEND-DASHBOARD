@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  ButtonGroup,
   Chip,
   Divider,
   IconButton,
@@ -21,10 +22,13 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveIcon from "@mui/icons-material/Save";
+import TodayIcon from "@mui/icons-material/Today";
 import { EmptyState } from "@/components/ui";
-import { isSundayISO, weekdayLong } from "@/lib/format";
+import { fmtDate, isSundayISO, todayISO, weekdayLong } from "@/lib/format";
 import { tableShellSx } from "@/lib/surface";
 
 type KnightOpt = { id: string; display_name: string; role: string | null; default_location: string | null };
@@ -43,7 +47,7 @@ const emptyRow = (role: "walker" | "biker"): Row => ({
   knight_id: null,
   role,
   location: "",
-  shift_time: "",
+  shift_time: "09:00 – 18:00",
   status: "working",
 });
 
@@ -52,6 +56,19 @@ const STATUS_LABEL: Record<Row["status"], string> = {
   leave: "Leave",
   half_day: "Half day",
 };
+
+const SHIFT_PRESETS = [
+  { label: "Morning", start: "08:00", end: "14:00" },
+  { label: "Full day", start: "09:00", end: "18:00" },
+  { label: "Evening", start: "14:00", end: "20:30" },
+] as const;
+
+function shiftDate(iso: string, deltaDays: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 function toTimeInputValue(raw: string): string {
   const s = raw.trim();
@@ -80,7 +97,7 @@ function formatShiftRange(start: string, end: string): string {
   return start || end || "";
 }
 
-const timeFieldSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff" }, minWidth: 108 };
+const timeFieldSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff" }, minWidth: 118 };
 
 export default function LineupEditor({
   knights,
@@ -107,13 +124,14 @@ export default function LineupEditor({
       const loaded: Row[] = (data.assignments ?? [])
         .filter((a: Record<string, unknown>) => a.status !== "leave")
         .map((a: Record<string, unknown>) => ({
-        knight_name: (a.knight_name as string) ?? (a.knights as { display_name?: string })?.display_name ?? "",
-        knight_id: (a.knight_id as string) ?? null,
-        role: a.role === "biker" ? "biker" : "walker",
-        location: (a.location as string) ?? "",
-        shift_time: (a.shift_time as string) ?? "",
-        status: (a.status as Row["status"]) ?? "working",
-      }));
+          knight_name:
+            (a.knight_name as string) ?? (a.knights as { display_name?: string })?.display_name ?? "",
+          knight_id: (a.knight_id as string) ?? null,
+          role: a.role === "biker" ? "biker" : "walker",
+          location: (a.location as string) ?? "",
+          shift_time: (a.shift_time as string) ?? "",
+          status: (a.status as Row["status"]) ?? "working",
+        }));
       setRows(loaded);
     } catch {
       setErr("Failed to load lineup for this date.");
@@ -135,31 +153,65 @@ export default function LineupEditor({
     [rows],
   );
 
-  const onLeave = useMemo(() => {
-    const linedIds = new Set(rows.filter((r) => r.knight_id).map((r) => r.knight_id));
-    const linedNames = new Set(
-      rows.filter((r) => r.knight_name.trim()).map((r) => r.knight_name.trim().toLowerCase()),
-    );
-    return knights.filter(
-      (k) => !linedIds.has(k.id) && !linedNames.has(k.display_name.toLowerCase()),
-    );
-  }, [knights, rows]);
+  const linedIds = useMemo(
+    () => new Set(rows.filter((r) => r.knight_id).map((r) => r.knight_id as string)),
+    [rows],
+  );
+  const linedNames = useMemo(
+    () => new Set(rows.filter((r) => r.knight_name.trim()).map((r) => r.knight_name.trim().toLowerCase())),
+    [rows],
+  );
+
+  const onLeave = useMemo(
+    () =>
+      knights.filter(
+        (k) => !linedIds.has(k.id) && !linedNames.has(k.display_name.toLowerCase()),
+      ),
+    [knights, linedIds, linedNames],
+  );
+
+  const availableKnights = useMemo(
+    () =>
+      knights.filter(
+        (k) => !linedIds.has(k.id) && !linedNames.has(k.display_name.toLowerCase()),
+      ),
+    [knights, linedIds, linedNames],
+  );
 
   function update(i: number, patch: Partial<Row>) {
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
   }
 
-  function onNameChange(i: number, name: string) {
-    const k = knights.find((x) => x.display_name.toLowerCase() === name.trim().toLowerCase());
+  function pickKnight(i: number, knightId: string) {
+    const k = knights.find((x) => x.id === knightId);
+    if (!k) {
+      update(i, { knight_id: null, knight_name: "" });
+      return;
+    }
     update(i, {
-      knight_name: name,
-      knight_id: k?.id ?? null,
-      ...(k && !rows[i]?.location && k.default_location ? { location: k.default_location } : {}),
+      knight_id: k.id,
+      knight_name: k.display_name,
+      location: rows[i]?.location?.trim() ? rows[i].location : (k.default_location ?? ""),
     });
   }
 
   function addRow(role: "walker" | "biker") {
     setRows((r) => [...r, emptyRow(role)]);
+  }
+
+  function addKnightFromLeave(k: KnightOpt) {
+    const role: "walker" | "biker" = k.role === "biker" ? "biker" : "walker";
+    setRows((r) => [
+      ...r,
+      {
+        knight_name: k.display_name,
+        knight_id: k.id,
+        role,
+        location: k.default_location ?? "",
+        shift_time: "09:00 – 18:00",
+        status: "working",
+      },
+    ]);
   }
 
   function removeRow(i: number) {
@@ -196,7 +248,9 @@ export default function LineupEditor({
       });
       if (res.ok) {
         const d = await res.json();
-        setMsg(`Saved · ${d.walker_count} walkers, ${d.biker_count} bikers${onLeave.length ? ` · ${onLeave.length} on leave` : ""}.`);
+        setMsg(
+          `Saved · ${d.walker_count} walkers, ${d.biker_count} bikers${onLeave.length ? ` · ${onLeave.length} on leave` : ""}.`,
+        );
       } else {
         const d = await res.json().catch(() => ({}));
         setErr(d.error || "Save failed");
@@ -208,6 +262,7 @@ export default function LineupEditor({
 
   const weekday = weekdayLong(date);
   const sunday = isSundayISO(date);
+  const isToday = date === todayISO();
 
   return (
     <Box>
@@ -257,9 +312,34 @@ export default function LineupEditor({
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
-          sx={{ p: 2, alignItems: { md: "center" }, flexWrap: "wrap" }}
+          sx={{ p: 2, alignItems: { md: "center" }, justifyContent: "space-between" }}
         >
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+            <ButtonGroup variant="outlined" size="small">
+              <IconButton
+                aria-label="Previous day"
+                onClick={() => setDate((d) => shiftDate(d, -1))}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "4px 0 0 4px" }}
+              >
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+              <Button
+                startIcon={<TodayIcon />}
+                onClick={() => setDate(todayISO())}
+                disabled={isToday}
+                sx={{ px: 1.5 }}
+              >
+                Today
+              </Button>
+              <IconButton
+                aria-label="Next day"
+                onClick={() => setDate((d) => shiftDate(d, 1))}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "0 4px 4px 0" }}
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </ButtonGroup>
+
             <TextField
               size="small"
               type="date"
@@ -268,19 +348,26 @@ export default function LineupEditor({
               onChange={(e) => setDate(e.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
             />
-            {weekday ? (
-              <Chip
-                size="small"
-                label={weekday}
-                color={sunday ? "warning" : "default"}
-                variant={sunday ? "filled" : "outlined"}
-              />
-            ) : null}
-            {sunday ? (
-              <Typography variant="caption" sx={{ color: "warning.dark" }}>
-                Sunday shift
+
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {fmtDate(date)}
               </Typography>
-            ) : null}
+              {weekday ? (
+                <Chip
+                  size="small"
+                  label={weekday}
+                  color={sunday ? "warning" : "default"}
+                  variant={sunday ? "filled" : "outlined"}
+                />
+              ) : null}
+              {isToday ? <Chip size="small" color="primary" variant="outlined" label="Today" /> : null}
+              {sunday ? (
+                <Typography variant="caption" sx={{ color: "warning.dark" }}>
+                  Sunday shift
+                </Typography>
+              ) : null}
+            </Stack>
           </Stack>
         </Stack>
       </Box>
@@ -302,12 +389,6 @@ export default function LineupEditor({
         </Typography>
       ) : null}
 
-      <datalist id="lineup-knights">
-        {knights.map((k) => (
-          <option key={k.id} value={k.display_name} />
-        ))}
-      </datalist>
-
       <Box
         sx={{
           display: "grid",
@@ -319,7 +400,9 @@ export default function LineupEditor({
         <RoleTable
           title="Walkers"
           rows={walkers}
-          onName={onNameChange}
+          availableKnights={availableKnights}
+          knights={knights}
+          pickKnight={pickKnight}
           update={update}
           remove={removeRow}
           onAdd={() => addRow("walker")}
@@ -327,7 +410,9 @@ export default function LineupEditor({
         <RoleTable
           title="Bikers"
           rows={bikers}
-          onName={onNameChange}
+          availableKnights={availableKnights}
+          knights={knights}
+          pickKnight={pickKnight}
           update={update}
           remove={removeRow}
           onAdd={() => addRow("biker")}
@@ -336,14 +421,19 @@ export default function LineupEditor({
 
       <Box sx={{ mt: 3 }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
-          <Typography variant="h2">On leave</Typography>
-          <Chip size="small" label={onLeave.length} variant="outlined" color={onLeave.length ? "warning" : "default"} />
+          <Typography variant="h2">Available / on leave</Typography>
+          <Chip
+            size="small"
+            label={onLeave.length}
+            variant="outlined"
+            color={onLeave.length ? "warning" : "default"}
+          />
         </Stack>
         <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
-          Active knights not added to today&apos;s lineup
+          Tap a knight to add them to today&apos;s lineup (defaults to full-day shift).
         </Typography>
         {onLeave.length === 0 ? (
-          <EmptyState message="Everyone active is on today's lineup." compact />
+          <EmptyState message="Everyone active is already on this day's lineup." compact />
         ) : (
           <TableContainer sx={tableShellSx}>
             <Table size="small">
@@ -352,15 +442,26 @@ export default function LineupEditor({
                   <TableCell>Knight</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell align="right" />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {onLeave.map((k) => (
                   <TableRow key={k.id} hover>
-                    <TableCell>{k.display_name}</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>{k.display_name}</TableCell>
                     <TableCell sx={{ textTransform: "capitalize" }}>{k.role ?? "—"}</TableCell>
                     <TableCell>
-                      <Chip size="small" label="On leave" color="warning" variant="outlined" />
+                      <Chip size="small" label="Not scheduled" color="warning" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={() => addKnightFromLeave(k)}
+                      >
+                        Add to lineup
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -376,14 +477,18 @@ export default function LineupEditor({
 function RoleTable({
   title,
   rows,
-  onName,
+  availableKnights,
+  knights,
+  pickKnight,
   update,
   remove,
   onAdd,
 }: {
   title: string;
   rows: { r: Row; i: number }[];
-  onName: (i: number, v: string) => void;
+  availableKnights: KnightOpt[];
+  knights: KnightOpt[];
+  pickKnight: (i: number, knightId: string) => void;
   update: (i: number, patch: Partial<Row>) => void;
   remove: (i: number) => void;
   onAdd: () => void;
@@ -405,7 +510,7 @@ function RoleTable({
       </Stack>
 
       {rows.length === 0 ? (
-        <EmptyState message={`No ${title.toLowerCase()} added yet.`} />
+        <EmptyState message={`No ${title.toLowerCase()} yet — add a row or pick someone below.`} />
       ) : (
         <TableContainer sx={tableShellSx}>
           <Table size="small">
@@ -413,42 +518,63 @@ function RoleTable({
               <TableRow>
                 <TableCell>Knight</TableCell>
                 <TableCell>Location</TableCell>
-                <TableCell>Shift (start – end)</TableCell>
+                <TableCell>Shift</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right" sx={{ width: 48 }} />
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map(({ r, i }) => (
-                <TableRow key={`${title}-${i}`} hover>
-                  <TableCell sx={{ minWidth: 120 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={r.knight_name}
-                      onChange={(e) => onName(i, e.target.value)}
-                      placeholder="Knight"
-                      slotProps={{
-                        htmlInput: { list: "lineup-knights" },
-                      }}
-                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 110 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={r.location}
-                      onChange={(e) => update(i, { location: e.target.value })}
-                      placeholder="Location"
-                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 230 }}>
-                    {(() => {
-                      const { start, end } = parseShiftRange(r.shift_time);
-                      return (
-                        <Stack direction="row" spacing={0.75}>
+              {rows.map(({ r, i }) => {
+                const { start, end } = parseShiftRange(r.shift_time);
+                const options = [
+                  ...knights.filter((k) => k.id === r.knight_id),
+                  ...availableKnights,
+                ];
+                const seen = new Set<string>();
+                const uniqueOptions = options.filter((k) => {
+                  if (seen.has(k.id)) return false;
+                  seen.add(k.id);
+                  return true;
+                });
+
+                return (
+                  <TableRow key={`${title}-${i}`} hover>
+                    <TableCell sx={{ minWidth: 140 }}>
+                      <Select
+                        size="small"
+                        fullWidth
+                        displayEmpty
+                        value={r.knight_id ?? ""}
+                        onChange={(e) => pickKnight(i, e.target.value)}
+                        sx={{ bgcolor: "#fff" }}
+                        renderValue={(value) => {
+                          if (!value) return <em style={{ color: "#94a3b8" }}>Select knight</em>;
+                          return knights.find((k) => k.id === value)?.display_name ?? r.knight_name;
+                        }}
+                      >
+                        <MenuItem value="">
+                          <em>Select knight</em>
+                        </MenuItem>
+                        {uniqueOptions.map((k) => (
+                          <MenuItem key={k.id} value={k.id}>
+                            {k.display_name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 110 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={r.location}
+                        onChange={(e) => update(i, { location: e.target.value })}
+                        placeholder="Area / hub"
+                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 260 }}>
+                      <Stack spacing={0.75}>
+                        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
                           <TextField
                             size="small"
                             type="time"
@@ -457,9 +583,15 @@ function RoleTable({
                             onChange={(e) =>
                               update(i, { shift_time: formatShiftRange(e.target.value, end) })
                             }
-                            slotProps={{ inputLabel: { shrink: true } }}
+                            slotProps={{
+                              inputLabel: { shrink: true },
+                              htmlInput: { step: 900 },
+                            }}
                             sx={timeFieldSx}
                           />
+                          <Typography variant="caption" sx={{ color: "text.secondary", pt: 1 }}>
+                            →
+                          </Typography>
                           <TextField
                             size="small"
                             type="time"
@@ -468,37 +600,58 @@ function RoleTable({
                             onChange={(e) =>
                               update(i, { shift_time: formatShiftRange(start, e.target.value) })
                             }
-                            slotProps={{ inputLabel: { shrink: true } }}
+                            slotProps={{
+                              inputLabel: { shrink: true },
+                              htmlInput: { step: 900 },
+                            }}
                             sx={timeFieldSx}
                           />
                         </Stack>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 110 }}>
-                    <Select
-                      size="small"
-                      fullWidth
-                      value={r.status}
-                      onChange={(e) => update(i, { status: e.target.value as Row["status"] })}
-                      sx={{ bgcolor: "#fff" }}
-                    >
-                      <MenuItem value="working">{STATUS_LABEL.working}</MenuItem>
-                      <MenuItem value="half_day">{STATUS_LABEL.half_day}</MenuItem>
-                    </Select>
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      color="error"
-                      aria-label="Remove row"
-                      onClick={() => remove(i)}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap" }}>
+                          {SHIFT_PRESETS.map((p) => {
+                            const active = start === p.start && end === p.end;
+                            return (
+                              <Chip
+                                key={p.label}
+                                size="small"
+                                label={p.label}
+                                variant={active ? "filled" : "outlined"}
+                                color={active ? "primary" : "default"}
+                                onClick={() =>
+                                  update(i, { shift_time: formatShiftRange(p.start, p.end) })
+                                }
+                                sx={{ cursor: "pointer" }}
+                              />
+                            );
+                          })}
+                        </Stack>
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 110 }}>
+                      <Select
+                        size="small"
+                        fullWidth
+                        value={r.status}
+                        onChange={(e) => update(i, { status: e.target.value as Row["status"] })}
+                        sx={{ bgcolor: "#fff" }}
+                      >
+                        <MenuItem value="working">{STATUS_LABEL.working}</MenuItem>
+                        <MenuItem value="half_day">{STATUS_LABEL.half_day}</MenuItem>
+                      </Select>
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label="Remove row"
+                        onClick={() => remove(i)}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

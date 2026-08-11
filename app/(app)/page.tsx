@@ -2,10 +2,11 @@ import Typography from "@mui/material/Typography";
 import { PageHeader } from "@/components/ui";
 import DashboardShell from "@/components/DashboardShell";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { attachAppOrders } from "@/lib/server/appOrders";
 import { getDeliveryFormOptions } from "@/lib/server/formOptions";
 import { getSessionUser } from "@/lib/server/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fmtDate, todayISO } from "@/lib/format";
 import type { ChartBundle, MonthPoint } from "@/components/BusinessOverview";
 import type { Delivery, WorkDay } from "@/lib/types";
@@ -148,12 +149,14 @@ async function getData(today: string) {
     attachAppOrders(db, (running.data ?? []) as Delivery[]),
   ]);
 
+  const activePending = pendingOrders.filter((d) => !isAppOrderCancelled(d.app_order));
+
   return {
     deliveries: (del.data ?? []) as Delivery[],
     workDay: (wd.data ?? null) as WorkDay | null,
     unpaidCount: unpaid.count ?? 0,
     reviewCount: review.count ?? 0,
-    pendingOrders,
+    pendingOrders: activePending,
     runningOrders,
     knights: formOpts.knights as { id: string; display_name: string }[],
     clients: formOpts.clients,
