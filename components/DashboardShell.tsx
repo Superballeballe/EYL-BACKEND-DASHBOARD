@@ -328,8 +328,6 @@ export default function DashboardShell(props: Props) {
               sx={{ mb: 2, flexWrap: "wrap" }}
               useFlexGap
             >
-              <Chip label={`${pendingCount} pending approval`} color={pendingCount ? "primary" : "default"} variant="outlined" />
-              <Chip label={`${runningCount} in progress`} color={runningCount ? "primary" : "default"} variant="outlined" />
               <Chip label={`${deliveries.length} today`} variant="outlined" />
               <Chip label={`${money(revenue)} revenue`} variant="outlined" />
             </Stack>
