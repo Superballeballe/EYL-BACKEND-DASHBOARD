@@ -1,19 +1,26 @@
 # EYL Dashboard — hardened compose setup.
 #
-#   docker compose up -d --build                 # app only, on 127.0.0.1:3000
-#   docker compose --profile proxy up -d --build # app + Caddy (auto-HTTPS) on 80/443
+#   docker compose --env-file .env.local up -d --build
+#   docker compose --env-file .env.local --profile proxy up -d --build
 #
-# Secrets come from .env.local (gitignored). See DEPLOY.md.
+# --env-file is required so NEXT_PUBLIC_* build args resolve from .env.local
+# (Compose does not read .env.local for ${} interpolation by default).
+# Runtime secrets still come from env_file below. See DEPLOY.md.
 
 services:
   dashboard:
     build:
       context: .
+      args:
+        # Baked into the client JS at `next build` — must be present here.
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     image: eyl-dashboard:latest
     container_name: eyl-dashboard
     restart: unless-stopped
 
-    # Secrets / config live in .env.local — never baked into the image.
+    # Server-side secrets / config — never baked into the image layers as files.
     # format: raw disables Compose's variable interpolation on the file, so
     # secrets containing a literal "$" (e.g. a DB password) are passed verbatim.
     env_file:
@@ -71,7 +78,7 @@ services:
       - eyl
 
   # Optional edge: terminates TLS, sets security headers, proxies to dashboard.
-  # Enable with:  docker compose --profile proxy up -d
+  # Enable with:  docker compose --env-file .env.local --profile proxy up -d
   caddy:
     image: caddy:2-alpine
     container_name: eyl-caddy

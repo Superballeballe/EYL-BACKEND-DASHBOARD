@@ -147,10 +147,11 @@ non-root user, and ships a `HEALTHCHECK` against `/api/health`.
 For self-hosting, a hardened `docker-compose.yml` is included:
 
 ```bash
-docker compose up -d --build                  # app only, on 127.0.0.1:3000
-docker compose --profile proxy up -d --build  # app + Caddy (auto-HTTPS) on 80/443
+docker compose --env-file .env.local up -d --build                  # app only, on 127.0.0.1:3000
+docker compose --env-file .env.local --profile proxy up -d --build  # app + Caddy (auto-HTTPS) on 80/443
 ```
 
+`--env-file .env.local` is required so `NEXT_PUBLIC_*` (Maps, Supabase) are available at image build time.
 Applied hardening:
 
 - **Non-root** runtime user, `no-new-privileges`, **all Linux capabilities dropped**
