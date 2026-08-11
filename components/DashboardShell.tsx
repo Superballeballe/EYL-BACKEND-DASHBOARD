@@ -26,7 +26,7 @@ import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
 import { fmtDatetimeLocal, money, routeAreaLabel } from "@/lib/format";
-import { formatSerialCode } from "@/lib/serial";
+import { formatDeliveryOrderId } from "@/lib/serial";
 import { gray, tableShellSx } from "@/lib/surface";
 import type { Delivery, WorkDay } from "@/lib/types";
 
@@ -151,7 +151,7 @@ function OrdersTable({
                       {routeAreaLabel(d.pickup_location, d.drop_location)}
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.35 }}>
-                      {formatSerialCode(d.mode_of_booking, d.serial_no, d.app_order_id)}
+                      {formatDeliveryOrderId(d)}
                       {d.drop_recipient_name ? ` · ${d.drop_recipient_name}` : ""}
                     </Typography>
                   </>
@@ -164,7 +164,7 @@ function OrdersTable({
                       {routeAreaLabel(d.pickup_location, d.drop_location)}
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-                      {formatSerialCode(d.mode_of_booking, d.serial_no, d.app_order_id)}
+                      {formatDeliveryOrderId(d)}
                       {d.drop_recipient_name ? ` · ${d.drop_recipient_name}` : ""}
                     </Typography>
                     {d.pickup_time_window ? (

@@ -24,7 +24,7 @@ import DeliveryForm from "@/components/DeliveryForm";
 import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/DeliveryLifecycleActions";
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money, routeAreaLabel } from "@/lib/format";
-import { formatSerialCode, serialPrefix } from "@/lib/serial";
+import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
 import { tableShellSx } from "@/lib/surface";
 import type { Delivery } from "@/lib/types";
 
@@ -110,11 +110,7 @@ export default function DeliveryTable({
               >
                 <TableCell>
                   <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {formatSerialCode(
-                      delivery.mode_of_booking,
-                      delivery.serial_no,
-                      delivery.app_order_id,
-                    )}
+                    {formatDeliveryOrderId(delivery)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                     {serialPrefix(delivery.mode_of_booking, delivery.app_order_id) === "APPEYL"
@@ -197,11 +193,7 @@ export default function DeliveryTable({
 }
 
 function orderMeta(delivery: Delivery) {
-  const orderId = formatSerialCode(
-    delivery.mode_of_booking,
-    delivery.serial_no,
-    delivery.app_order_id,
-  );
+  const orderId = formatDeliveryOrderId(delivery);
   const source = serialPrefix(delivery.mode_of_booking, delivery.app_order_id) === "APPEYL" ? "App" : "Manual";
   return { orderId, source };
 }

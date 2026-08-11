@@ -18,6 +18,18 @@ export function formatSerialCode(
   return `${serialPrefix(mode, appOrderId)}-${String(Math.round(serialNo)).padStart(2, "0")}`;
 }
 
+/** Prefer app `order_code` (e.g. EYL160421); fall back to dashboard serial. */
+export function formatDeliveryOrderId(delivery: {
+  mode_of_booking?: "b2b" | "online" | null;
+  serial_no?: number | null;
+  app_order_id?: string | null;
+  app_order?: { order_code?: string | null } | null;
+}): string {
+  const code = delivery.app_order?.order_code?.trim();
+  if (code) return code;
+  return formatSerialCode(delivery.mode_of_booking, delivery.serial_no, delivery.app_order_id);
+}
+
 /** APPEYL-12 / MANEYL-5 / plain digits → serial number for search. */
 export function parseSerialQuery(q: string): number | null {
   const trimmed = q.trim();

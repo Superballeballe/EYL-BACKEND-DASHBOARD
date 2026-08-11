@@ -19,7 +19,7 @@ import {
 import { PageHeader } from "@/components/ui";
 import { drawRoute, resolveDeliveryCoords } from "@/lib/mapsClient";
 import { GoogleMapsLoadError, hasGoogleMapsKey, loadGoogleMaps } from "@/lib/loadGoogleMaps";
-import { formatSerialCode } from "@/lib/serial";
+import { formatDeliveryOrderId } from "@/lib/serial";
 import type { Delivery } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
@@ -40,6 +40,7 @@ type MapDelivery = Pick<
   | "fulfillment_status"
   | "mode_of_booking"
   | "app_order_id"
+  | "app_order"
 >;
 
 const ROUTE_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0891b2", "#4f46e5"];
@@ -72,13 +73,17 @@ export default function PlottingMapBoard({
     () =>
       deliveries.filter(
         (d) =>
-          d.knight_name?.trim() &&
           d.pickup_location?.trim() &&
           d.drop_location?.trim() &&
           d.fulfillment_status !== "cancelled",
       ),
     [deliveries],
   );
+
+  useEffect(() => {
+    setDate(initialDate);
+    setKnightId(initialKnightId);
+  }, [initialDate, initialKnightId]);
 
   useEffect(() => {
     if (!hasGoogleMapsKey()) return;
@@ -176,8 +181,7 @@ export default function PlottingMapBoard({
   }
 
   function serialLabel(d: MapDelivery) {
-    if (d.serial_no == null) return "Delivery";
-    return formatSerialCode(d.mode_of_booking, d.serial_no, d.app_order_id);
+    return formatDeliveryOrderId(d);
   }
 
   if (ready === false) {
@@ -216,7 +220,7 @@ export default function PlottingMapBoard({
     <Box>
       <PageHeader
         title="Plotting map"
-        subtitle="Routes for assigned delivery partners — pickup to drop, plotted per delivery."
+        subtitle="Routes from deliveries — pickup to drop, filtered by task date and partner."
       />
 
       <Box
@@ -254,7 +258,7 @@ export default function PlottingMapBoard({
                     applyFilters(date, next);
                   }}
                 >
-                  <MenuItem value="">All assigned</MenuItem>
+                  <MenuItem value="">All deliveries</MenuItem>
                   {knights.map((k) => (
                     <MenuItem key={k.id} value={k.id}>
                       {k.display_name}
@@ -273,8 +277,8 @@ export default function PlottingMapBoard({
               <Stack spacing={1} sx={{ maxHeight: { lg: "calc(100vh - 320px)" }, overflowY: "auto" }}>
                 {assigned.length === 0 ? (
                   <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
-                    No assigned deliveries for {date}. Check the task date matches your delivery, assign a
-                    knight on the delivery, and ensure pickup/drop addresses are filled.
+                    No deliveries with pickup/drop for {date}. Pick another task date, or fill addresses on
+                    the delivery.
                   </Typography>
                 ) : (
                   assigned.map((d, i) => {
@@ -312,7 +316,7 @@ export default function PlottingMapBoard({
                           </Typography>
                         </Stack>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                          {d.knight_name}
+                          {d.knight_name?.trim() || "Unassigned"}
                         </Typography>
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
                           {d.sender_name ?? "—"}

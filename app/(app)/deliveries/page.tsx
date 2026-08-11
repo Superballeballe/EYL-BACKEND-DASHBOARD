@@ -7,6 +7,7 @@ import DeliveriesPagination from "@/components/DeliveriesPagination";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/ui";
 import DeliveryTable from "@/components/DeliveryTable";
+import { attachAppOrders } from "@/lib/server/appOrders";
 import { getDeliveryFormOptions } from "@/lib/server/formOptions";
 import { getSessionUser } from "@/lib/server/session";
 import { fmtDate } from "@/lib/format";
@@ -19,29 +20,6 @@ const LIMIT = 100;
 
 type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
-
-const APP_ORDER_SELECTS = [
-  "id, order_code, status, rider_name, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
-  "id, order_code, status",
-  "id, order_code",
-];
-
-async function loadAppOrders(
-  db: ReturnType<typeof supabaseAdmin>,
-  appOrderIds: string[],
-): Promise<{ orders: NonNullable<Delivery["app_order"]>[]; error: string | null }> {
-  for (const columns of APP_ORDER_SELECTS) {
-    const { data, error } = await db.from("orders").select(columns).in("id", appOrderIds);
-    if (!error) {
-      return {
-        orders: (data ?? []) as unknown as NonNullable<Delivery["app_order"]>[],
-        error: null,
-      };
-    }
-  }
-
-  return { orders: [], error: "App order status could not be loaded." };
-}
 
 export default async function DeliveriesPage({
   searchParams,
@@ -108,28 +86,7 @@ export default async function DeliveriesPage({
   }
 
   const { data, count, error: deliveriesError } = await query;
-  const deliveryRows = (data ?? []) as Delivery[];
-  const appOrderIds = Array.from(
-    new Set(deliveryRows.map((row) => row.app_order_id).filter((id): id is string => Boolean(id))),
-  );
-  const appOrdersById = new Map<string, NonNullable<Delivery["app_order"]>>();
-  let appOrdersError: string | null = null;
-
-  if (appOrderIds.length > 0) {
-    const { orders: appOrders, error } = await loadAppOrders(db, appOrderIds);
-    if (error) {
-      appOrdersError = error;
-    } else {
-      for (const order of appOrders) {
-        appOrdersById.set(order.id, order as NonNullable<Delivery["app_order"]>);
-      }
-    }
-  }
-
-  const rows = deliveryRows.map((row) => ({
-    ...row,
-    app_order: row.app_order_id ? appOrdersById.get(row.app_order_id) ?? null : null,
-  }));
+  const { rows, error: appOrdersError } = await attachAppOrders(db, (data ?? []) as Delivery[]);
   const total = count ?? 0;
 
   const dateSummary =

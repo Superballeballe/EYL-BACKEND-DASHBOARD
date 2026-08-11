@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui";
 import DashboardShell from "@/components/DashboardShell";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { attachAppOrders } from "@/lib/server/appOrders";
 import { getDeliveryFormOptions } from "@/lib/server/formOptions";
 import { getSessionUser } from "@/lib/server/session";
 import { fmtDate, todayISO } from "@/lib/format";
@@ -142,13 +143,18 @@ async function getData(today: string) {
     (d) => d.payment_status === "unpaid" || d.payment_status === "partial",
   );
 
+  const [{ rows: pendingOrders }, { rows: runningOrders }] = await Promise.all([
+    attachAppOrders(db, (pending.data ?? []) as Delivery[]),
+    attachAppOrders(db, (running.data ?? []) as Delivery[]),
+  ]);
+
   return {
     deliveries: (del.data ?? []) as Delivery[],
     workDay: (wd.data ?? null) as WorkDay | null,
     unpaidCount: unpaid.count ?? 0,
     reviewCount: review.count ?? 0,
-    pendingOrders: (pending.data ?? []) as Delivery[],
-    runningOrders: (running.data ?? []) as Delivery[],
+    pendingOrders,
+    runningOrders,
     knights: formOpts.knights as { id: string; display_name: string }[],
     clients: formOpts.clients,
     rateTiers: formOpts.rateTiers,
