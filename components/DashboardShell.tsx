@@ -321,18 +321,6 @@ export default function DashboardShell(props: Props) {
 
       {tab === 0 && (
         <Box>
-          {!bothEmpty ? (
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mb: 2, flexWrap: "wrap" }}
-              useFlexGap
-            >
-              <Chip label={`${deliveries.length} today`} variant="outlined" />
-              <Chip label={`${money(revenue)} revenue`} variant="outlined" />
-            </Stack>
-          ) : null}
-
           <Box
             sx={{
               display: "grid",
