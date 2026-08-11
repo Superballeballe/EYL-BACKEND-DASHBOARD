@@ -5,24 +5,43 @@ import { todayISO } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
+function currentMonth(): string {
+  return todayISO().slice(0, 7);
+}
+
+function monthRange(ym: string): { from: string; to: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return { from: `${ym}-01`, to: `${ym}-${pad(last)}` };
+}
+
+function parseMonth(sp: { month?: string; date?: string }): string {
+  if (sp.month && /^\d{4}-\d{2}$/.test(sp.month)) return sp.month;
+  // Back-compat: ?date=YYYY-MM-DD → that month
+  if (sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date)) return sp.date.slice(0, 7);
+  return currentMonth();
+}
+
 export default async function MapPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; knight_id?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; knight_id?: string }>;
 }) {
   const sp = await searchParams;
   const knightId = sp.knight_id ?? "";
   const db = supabaseAdmin();
 
-  let date =
-    sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayISO();
+  let month = parseMonth(sp);
 
-  // Default to the latest delivery task date when today has nothing to plot.
-  if (!sp.date) {
+  // Default to the latest delivery month when the current month is empty.
+  if (!sp.month && !sp.date) {
+    const { from, to } = monthRange(month);
     const { count } = await db
       .from("deliveries")
       .select("id", { count: "exact", head: true })
-      .eq("task_date", date)
+      .gte("task_date", from)
+      .lte("task_date", to)
       .neq("fulfillment_status", "cancelled")
       .not("pickup_location", "is", null)
       .not("drop_location", "is", null)
@@ -40,21 +59,25 @@ export default async function MapPage({
         .order("task_date", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (latest?.task_date) date = latest.task_date;
+      if (latest?.task_date) month = latest.task_date.slice(0, 7);
     }
   }
+
+  const { from, to } = monthRange(month);
 
   let query = db
     .from("deliveries")
     .select(
-      "id, serial_no, sender_name, pickup_location, drop_location, pickup_lat, pickup_lng, drop_lat, drop_lng, knight_name, knight_id, fulfillment_status, mode_of_booking, app_order_id",
+      "id, serial_no, sender_name, pickup_location, drop_location, pickup_lat, pickup_lng, drop_lat, drop_lng, knight_name, knight_id, fulfillment_status, mode_of_booking, app_order_id, task_date",
     )
-    .eq("task_date", date)
+    .gte("task_date", from)
+    .lte("task_date", to)
     .neq("fulfillment_status", "cancelled")
     .not("pickup_location", "is", null)
     .not("drop_location", "is", null)
     .neq("pickup_location", "")
     .neq("drop_location", "")
+    .order("task_date", { ascending: true })
     .order("serial_no", { ascending: true, nullsFirst: false });
 
   if (knightId) {
@@ -75,7 +98,6 @@ export default async function MapPage({
   const { data: deliveryRows } = await query;
   const { rows: deliveries } = await attachAppOrders(db, deliveryRows ?? []);
 
-  // Knights present on today's deliveries (by id or name), plus any selected knight.
   const nameSet = new Set<string>();
   const idSet = new Set<string>();
   for (const d of deliveries) {
@@ -93,7 +115,6 @@ export default async function MapPage({
     (k) => idSet.has(k.id) || nameSet.has(k.display_name),
   );
 
-  // Include name-only knights (e.g. assigned before knight_id was set).
   const knownNames = new Set(knightsFromDeliveries.map((k) => k.display_name));
   for (const name of nameSet) {
     if (!knownNames.has(name)) {
@@ -105,7 +126,7 @@ export default async function MapPage({
     <PlottingMapBoard
       deliveries={deliveries}
       knights={knightsFromDeliveries}
-      initialDate={date}
+      initialMonth={month}
       initialKnightId={knightId}
     />
   );

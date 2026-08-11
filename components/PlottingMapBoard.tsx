@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui";
 import { drawRoute, resolveDeliveryCoords } from "@/lib/mapsClient";
 import { GoogleMapsLoadError, hasGoogleMapsKey, loadGoogleMaps } from "@/lib/loadGoogleMaps";
 import { formatDeliveryOrderId } from "@/lib/serial";
+import { fmtShortDate } from "@/lib/format";
 import type { Delivery } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
@@ -41,6 +42,7 @@ type MapDelivery = Pick<
   | "mode_of_booking"
   | "app_order_id"
   | "app_order"
+  | "task_date"
 >;
 
 const ROUTE_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0891b2", "#4f46e5"];
@@ -48,12 +50,12 @@ const ROUTE_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0891b2", "#4
 export default function PlottingMapBoard({
   deliveries,
   knights,
-  initialDate,
+  initialMonth,
   initialKnightId = "",
 }: {
   deliveries: MapDelivery[];
   knights: KnightOpt[];
-  initialDate: string;
+  initialMonth: string;
   initialKnightId?: string;
 }) {
   const router = useRouter();
@@ -66,7 +68,7 @@ export default function PlottingMapBoard({
   const [mapError, setMapError] = useState<string | null>(null);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [date, setDate] = useState(initialDate);
+  const [month, setMonth] = useState(initialMonth);
   const [knightId, setKnightId] = useState(initialKnightId);
 
   const assigned = useMemo(
@@ -81,9 +83,9 @@ export default function PlottingMapBoard({
   );
 
   useEffect(() => {
-    setDate(initialDate);
+    setMonth(initialMonth);
     setKnightId(initialKnightId);
-  }, [initialDate, initialKnightId]);
+  }, [initialMonth, initialKnightId]);
 
   useEffect(() => {
     if (!hasGoogleMapsKey()) return;
@@ -173,9 +175,9 @@ export default function PlottingMapBoard({
     };
   }, [ready, assigned]);
 
-  function applyFilters(nextDate: string, nextKnightId: string) {
+  function applyFilters(nextMonth: string, nextKnightId: string) {
     const params = new URLSearchParams();
-    if (nextDate) params.set("date", nextDate);
+    if (nextMonth) params.set("month", nextMonth);
     if (nextKnightId) params.set("knight_id", nextKnightId);
     router.replace(`/map?${params.toString()}`, { scroll: false });
   }
@@ -220,7 +222,7 @@ export default function PlottingMapBoard({
     <Box>
       <PageHeader
         title="Plotting map"
-        subtitle="Routes from deliveries — pickup to drop, filtered by task date and partner."
+        subtitle="Monthly routes from deliveries — pickup to drop, filtered by partner."
       />
 
       <Box
@@ -236,11 +238,11 @@ export default function PlottingMapBoard({
             <Stack spacing={2}>
               <TextField
                 size="small"
-                type="date"
-                label="Task date"
-                value={date}
+                type="month"
+                label="Month"
+                value={month}
                 onChange={(e) => {
-                  setDate(e.target.value);
+                  setMonth(e.target.value);
                   applyFilters(e.target.value, knightId);
                 }}
                 slotProps={{ inputLabel: { shrink: true } }}
@@ -255,7 +257,7 @@ export default function PlottingMapBoard({
                   onChange={(e) => {
                     const next = e.target.value;
                     setKnightId(next);
-                    applyFilters(date, next);
+                    applyFilters(month, next);
                   }}
                 >
                   <MenuItem value="">All deliveries</MenuItem>
@@ -277,7 +279,7 @@ export default function PlottingMapBoard({
               <Stack spacing={1} sx={{ maxHeight: { lg: "calc(100vh - 320px)" }, overflowY: "auto" }}>
                 {assigned.length === 0 ? (
                   <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
-                    No deliveries with pickup/drop for {date}. Pick another task date, or fill addresses on
+                    No deliveries with pickup/drop for {month}. Pick another month, or fill addresses on
                     the delivery.
                   </Typography>
                 ) : (
@@ -316,7 +318,8 @@ export default function PlottingMapBoard({
                           </Typography>
                         </Stack>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                          {d.knight_name?.trim() || "Unassigned"}
+                          {fmtShortDate(d.task_date)}
+                          {d.knight_name?.trim() ? ` · ${d.knight_name}` : " · Unassigned"}
                         </Typography>
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
                           {d.sender_name ?? "—"}
