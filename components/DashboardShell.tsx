@@ -112,7 +112,9 @@ function OrdersTable({
         <TableHead>
           <TableRow>
             <TableCell>Sender · route</TableCell>
-            <TableCell sx={{ width: "7rem" }}>Knight</TableCell>
+            {mode === "running" ? (
+              <TableCell sx={{ width: "7rem" }}>Knight</TableCell>
+            ) : null}
             <TableCell sx={{ width: "4.5rem" }} align="right">
               Fees
             </TableCell>
@@ -175,9 +177,11 @@ function OrdersTable({
                   </>
                 )}
               </TableCell>
-              <TableCell sx={{ verticalAlign: "top", pt: 1.5 }}>
-                <Typography variant="body2">{d.knight_name ?? "—"}</Typography>
-              </TableCell>
+              {mode === "running" ? (
+                <TableCell sx={{ verticalAlign: "top", pt: 1.5 }}>
+                  <Typography variant="body2">{d.knight_name ?? "—"}</Typography>
+                </TableCell>
+              ) : null}
               <TableCell
                 align="right"
                 sx={{ verticalAlign: "top", pt: 1.5, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
