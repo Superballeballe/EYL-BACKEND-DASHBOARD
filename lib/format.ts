@@ -16,6 +16,21 @@ export function fmtDate(s: string | null | undefined): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+export function fmtDateTime(s: string | null | undefined): string {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  });
+}
+
 export function fmtShortDate(s: string | null | undefined): string {
   if (!s) return "—";
   const d = new Date(s.length <= 10 ? s + "T00:00:00" : s);

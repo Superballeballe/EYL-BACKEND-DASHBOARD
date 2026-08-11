@@ -19,6 +19,7 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
@@ -41,6 +42,7 @@ const LINKS = [
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
   { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
+  { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
 ] as const;
 
 const ADMIN_LINKS = [{ href: "/admin/users", label: "Team", Icon: ManageAccountsOutlinedIcon }] as const;

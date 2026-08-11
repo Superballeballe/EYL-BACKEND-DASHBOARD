@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { monthlyCouponSchema } from "@/lib/schemas";
-import { created, ok, parseBody, serverError } from "@/lib/api";
+import { badRequest, created, ok, parseBody, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -27,10 +27,15 @@ export async function POST(req: Request) {
   try {
     const { data, error } = await supabaseAdmin()
       .from("monthly_coupons")
-      .upsert(parsed.data, { onConflict: "year_month" })
+      .insert(parsed.data)
       .select()
       .single();
-    if (error) return serverError(error);
+    if (error) {
+      if (error.code === "23505") {
+        return badRequest(`Coupon code "${parsed.data.code}" already exists`);
+      }
+      return serverError(error);
+    }
     return created(data);
   } catch (e) {
     return serverError(e);

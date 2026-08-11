@@ -70,8 +70,7 @@ export default function AdminUsersBoard({
   const [deleting, setDeleting] = useState(false);
   const [cancellingInvite, setCancellingInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [emailNote, setEmailNote] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
 
   async function refreshTeam() {
     const data = await fetch("/api/admin/users").then((r) => r.json());
@@ -82,8 +81,7 @@ export default function AdminUsersBoard({
   async function sendInvite() {
     setLoading(true);
     setError(null);
-    setInviteUrl(null);
-    setEmailNote(null);
+    setInviteNotice(null);
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
@@ -95,8 +93,12 @@ export default function AdminUsersBoard({
         setError(data.error || "Invite failed");
         return;
       }
-      setInviteUrl(data.inviteUrl);
-      if (!data.emailSent && data.emailNote) setEmailNote(data.emailNote);
+      const invitedEmail = data.invite?.email ?? email.trim().toLowerCase();
+      setInviteNotice(
+        data.emailSent
+          ? `Invite created. Email sent. to ${invitedEmail}`
+          : `Invite created. Email not sent to ${invitedEmail}.${data.emailNote ? ` ${data.emailNote}` : ""}`,
+      );
       setEmail("");
       setOpen(false);
       await refreshTeam();
@@ -182,12 +184,9 @@ export default function AdminUsersBoard({
         </Alert>
       ) : null}
 
-      {inviteUrl ? (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setInviteUrl(null)}>
-          Invite created.{emailNote ? ` Email not sent (${emailNote}).` : " Email sent."} Share link:{" "}
-          <Typography component="span" sx={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: "0.85em" }}>
-            {inviteUrl}
-          </Typography>
+      {inviteNotice ? (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setInviteNotice(null)}>
+          {inviteNotice}
         </Alert>
       ) : null}
 

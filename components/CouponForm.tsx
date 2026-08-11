@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Alert,
   Box,
@@ -11,9 +10,11 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Slider,
   Stack,
   Switch,
   TextField,
+  Typography,
 } from "@mui/material";
 
 function currentYearMonth() {
@@ -27,9 +28,11 @@ function currentYearMonth() {
   return `${year}-${month}`;
 }
 
+import type { MonthlyCoupon } from "@/lib/types";
+
 type CouponFormProps = {
   couponId?: string;
-  onSuccess?: () => void;
+  onSuccess?: (coupon: MonthlyCoupon) => void;
   initial?: {
     year_month?: string;
     code?: string;
@@ -41,17 +44,29 @@ type CouponFormProps = {
 };
 
 export default function CouponForm({ couponId, onSuccess, initial }: CouponFormProps) {
-  const router = useRouter();
   const [v, setV] = useState({
     year_month: initial?.year_month ?? currentYearMonth(),
     code: initial?.code ?? "",
     type: initial?.type ?? "percent",
-    value: initial?.value != null ? String(initial.value) : "",
+    value: initial?.value != null ? String(initial.value) : "10",
     label: initial?.label ?? "",
     active: initial?.active ?? true,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  function setType(type: "percent" | "flat") {
+    setV((s) => {
+      const next = { ...s, type };
+      if (type === "percent") {
+        const n = Math.min(100, Math.max(1, Number(s.value) || 10));
+        next.value = String(n);
+      }
+      return next;
+    });
+  }
+
+  const percentValue = Math.min(100, Math.max(1, Number(v.value) || 10));
 
   function set(k: string, val: string | boolean) {
     setV((s) => ({ ...s, [k]: val }));
@@ -61,15 +76,20 @@ export default function CouponForm({ couponId, onSuccess, initial }: CouponFormP
     e.preventDefault();
     setBusy(true);
     setErr(null);
+    const label =
+      v.label.trim() ||
+      (v.type === "percent" ? `${percentValue}% off` : `₹${v.value} off`);
+    const payload = { ...v, label, value: v.type === "percent" ? percentValue : v.value };
     const res = await fetch(couponId ? `/api/coupons/${couponId}` : "/api/coupons", {
       method: couponId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(v),
+      body: JSON.stringify(payload),
     });
     setBusy(false);
     if (res.ok) {
-      router.refresh();
-      onSuccess?.();
+      const saved = (await res.json()) as MonthlyCoupon;
+      onSuccess?.(saved);
+      return;
     } else {
       const d = await res.json().catch(() => ({}));
       setErr(d.error || "Save failed");
@@ -107,23 +127,44 @@ export default function CouponForm({ couponId, onSuccess, initial }: CouponFormP
             labelId="coupon-type-label"
             label="Discount type"
             value={v.type}
-            onChange={(e) => set("type", e.target.value)}
+            onChange={(e) => setType(e.target.value as "percent" | "flat")}
           >
             <MenuItem value="percent">Percent off</MenuItem>
             <MenuItem value="flat">Flat ₹ off</MenuItem>
           </Select>
         </FormControl>
 
-        <TextField
-          size="small"
-          fullWidth
-          type="number"
-          label={v.type === "percent" ? "Percent value" : "Amount (₹)"}
-          slotProps={{ htmlInput: { min: 1, step: 1 } }}
-          value={v.value}
-          onChange={(e) => set("value", e.target.value)}
-          required
-        />
+        {v.type === "percent" ? (
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+              {percentValue}% off
+            </Typography>
+            <Slider
+              value={percentValue}
+              min={1}
+              max={100}
+              step={1}
+              marks={[
+                { value: 1, label: "1%" },
+                { value: 100, label: "100%" },
+              ]}
+              valueLabelDisplay="auto"
+              valueLabelFormat={(n) => `${n}%`}
+              onChange={(_, val) => set("value", String(val))}
+            />
+          </Box>
+        ) : (
+          <TextField
+            size="small"
+            fullWidth
+            type="number"
+            label="Amount (₹)"
+            slotProps={{ htmlInput: { min: 1, step: 1 } }}
+            value={v.value}
+            onChange={(e) => set("value", e.target.value)}
+            required
+          />
+        )}
 
         <TextField
           size="small"
@@ -148,7 +189,7 @@ export default function CouponForm({ couponId, onSuccess, initial }: CouponFormP
         {err ? <Alert severity="error">{err}</Alert> : null}
 
         <Button type="submit" variant="contained" disabled={busy} fullWidth>
-          {busy ? "Saving…" : couponId ? "Update coupon" : "Save coupon"}
+          {busy ? "Saving…" : couponId ? "Save changes" : "Create coupon"}
         </Button>
       </Stack>
     </Box>

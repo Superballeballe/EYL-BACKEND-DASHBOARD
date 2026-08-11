@@ -2,6 +2,7 @@
 const nextConfig = {
   // Allow self-hosting as a standalone server bundle (Docker-friendly).
   output: "standalone",
+  allowedDevOrigins: ["127.0.2.2", "localhost"],
   eslint: {
     // Don't fail production builds on lint; lint is run separately.
     ignoreDuringBuilds: true,

@@ -293,7 +293,7 @@ export type LineupInput = z.infer<typeof lineupSchema>;
 // ---- monthly coupons -------------------------------------------------------
 const couponTypeField = z.enum(["percent", "flat"]);
 
-export const monthlyCouponSchema = z.object({
+const monthlyCouponBaseSchema = z.object({
   year_month: z.string().regex(/^\d{4}-\d{2}$/, "Expected YYYY-MM"),
   code: z.string().trim().min(1, "Code is required").transform((s) => s.toUpperCase()),
   type: couponTypeField,
@@ -301,5 +301,13 @@ export const monthlyCouponSchema = z.object({
   label: z.string().trim().min(1, "Label is required"),
   active: z.boolean().default(true),
 });
-export const monthlyCouponUpdateSchema = monthlyCouponSchema.partial();
+
+function percentMaxRefine(data: { type?: "percent" | "flat"; value?: number }, ctx: z.RefinementCtx) {
+  if (data.type === "percent" && data.value != null && data.value > 100) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Percent cannot exceed 100", path: ["value"] });
+  }
+}
+
+export const monthlyCouponSchema = monthlyCouponBaseSchema.superRefine(percentMaxRefine);
+export const monthlyCouponUpdateSchema = monthlyCouponBaseSchema.partial().superRefine(percentMaxRefine);
 export type MonthlyCouponInput = z.infer<typeof monthlyCouponSchema>;

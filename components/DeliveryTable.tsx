@@ -167,7 +167,7 @@ export default function DeliveryTable({
                   {money(delivery.fees)}
                 </TableCell>
                 <TableCell>
-                  <PaymentBadge status={delivery.payment_status} />
+                  <PaymentBadge status={delivery.payment_status} mode={delivery.payment_mode} />
                 </TableCell>
                 <TableCell>
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -485,7 +485,7 @@ function DeliveryPreview({
           <InfoTile label="Sender" value={delivery.sender_name} />
           <InfoTile label="Knight" value={delivery.knight_name} />
           <InfoTile label="Fees" value={money(delivery.fees)} />
-          <InfoTile label="Payment" value={<PaymentBadge status={delivery.payment_status} />} />
+          <InfoTile label="Payment" value={<PaymentBadge status={delivery.payment_status} mode={delivery.payment_mode} />} />
           <InfoTile label="Kms" value={delivery.kms == null ? "—" : `${delivery.kms} km`} />
           <InfoTile label="Mode" value={formatBookingMode(delivery.mode_of_booking)} />
           <InfoTile label="Invoice" value={delivery.invoice_no} />

@@ -111,15 +111,28 @@ export function StatCard({
   );
 }
 
-export function PaymentBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <Chip size="small" label="—" variant="outlined" />;
-  const color = status === "paid" || status === "free" ? "primary" : "default";
+export function PaymentBadge({
+  status,
+  mode,
+}: {
+  status?: string | null;
+  mode?: string | null;
+}) {
+  const modeLabel = mode?.trim().toLowerCase();
+  const label =
+    modeLabel === "coupon"
+      ? "coupon"
+      : modeLabel && !status
+        ? modeLabel
+        : status || modeLabel || null;
+  if (!label) return <Chip size="small" label="—" variant="outlined" />;
+  const color = label === "paid" || label === "free" || label === "coupon" ? "primary" : "default";
   return (
     <Chip
       size="small"
       color={color as "primary" | "default"}
-      label={status}
-      variant={status === "unpaid" ? "outlined" : "filled"}
+      label={label}
+      variant={label === "unpaid" ? "outlined" : "filled"}
     />
   );
 }

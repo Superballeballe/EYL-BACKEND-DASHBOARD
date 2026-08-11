@@ -86,8 +86,47 @@ export type MonthlyCoupon = {
   value: number;
   label: string;
   active: boolean;
+  redemption_count: number;
   created_at: string;
   updated_at: string;
+};
+
+export type CouponRedemption = {
+  id: string;
+  coupon_id: string;
+  user_id: string;
+  order_id: string;
+  code: string;
+  redeemed_at: string;
+  orders?: { order_code: string | null } | null;
+  monthly_coupons?: { code: string; label: string } | null;
+};
+
+export type AppInvoice = {
+  id: string;
+  order_id: string;
+  invoice_number: string;
+  invoice_type: string | null;
+  payment_method: string | null;
+  payment_status: string | null;
+  subtotal: number | null;
+  discount_amount: number | null;
+  tax_amount: number | null;
+  total_amount: number | null;
+  is_gst: boolean | null;
+  seller_gstin: string | null;
+  buyer_gstin: string | null;
+  taxable_value: number | null;
+  cgst_amount: number | null;
+  sgst_amount: number | null;
+  igst_amount: number | null;
+  is_interstate: boolean | null;
+  issued_at: string;
+  metadata: {
+    coupon?: { code?: string; label?: string; discount?: number } | null;
+    payment_label?: string | null;
+  } | null;
+  orders?: { order_code: string | null } | null;
 };
 
 export type Delivery = {
