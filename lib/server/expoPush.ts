@@ -24,6 +24,12 @@ type SendPaymentWindowOptions = {
   deliveryScheduledAt?: string | null;
 };
 
+type PushPayload = {
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+};
+
 function isExpoPushToken(token: string) {
   return /^ExponentPushToken\[[\w-]+\]$/.test(token) || /^ExpoPushToken\[[\w-]+\]$/.test(token);
 }
@@ -86,7 +92,7 @@ export async function sendPaymentWindowNotification(
   const suffix = target.order_code ? ` · ${target.order_code}` : "";
   const drop = formatPushTime(deliveryScheduledAt);
   const dropNote = drop ? ` Drop by ${drop}.` : "";
-  const payloads = [];
+  const payloads: PushPayload[] = [];
 
   if (knightName?.trim()) {
     payloads.push({
@@ -172,7 +178,7 @@ export async function sendOrderAssignedNotification(
   const drop = formatPushTime(deliveryScheduledAt);
   const dropNote = drop ? ` Drop by ${drop}.` : "";
 
-  const payloads = [
+  const payloads: PushPayload[] = [
     {
       title: "Delivery knight assigned",
       body: `${knightName} has been assigned to your delivery.${dropNote}${suffix}`,
