@@ -26,6 +26,7 @@ import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlin
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
 import { gray } from "@/lib/surface";
 
 const SIDEBAR_STORAGE_KEY = "eyl-sidebar-collapsed";
@@ -38,6 +39,7 @@ const LINKS = [
   { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
   { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
   { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
+  { href: "/eyl-knights", label: "EYL Knights", Icon: TwoWheelerOutlinedIcon },
   { href: "/salaries", label: "Salaries", Icon: BadgeOutlinedIcon },
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },

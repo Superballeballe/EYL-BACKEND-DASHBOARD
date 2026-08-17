@@ -13,6 +13,26 @@ export type Knight = {
   updated_at: string;
 };
 
+export type EylKnight = {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  documents: Record<string, string>;
+  work_areas: string[];
+  knight_role: "walker" | "biker" | null;
+  status: "pending" | "documents" | "submitted" | "approved" | "rejected";
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  review_note: string | null;
+  knight_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type KnightSalary = {
   id: string;
   knight_id: string;
@@ -180,6 +200,7 @@ export type Delivery = {
     order_code: string | null;
     status: "registered" | "accepted" | "rider_assigned" | "picked_up" | "delivered" | "cancelled" | string | null;
     rider_name?: string | null;
+    scheduled_for?: string | null;
     pickup_scheduled_at?: string | null;
     delivery_scheduled_at?: string | null;
     accepted_at?: string | null;

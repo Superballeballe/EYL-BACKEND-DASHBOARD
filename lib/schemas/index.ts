@@ -232,6 +232,20 @@ export const knightSchema = z.object({
 export const knightUpdateSchema = knightSchema.partial();
 export type KnightInput = z.infer<typeof knightSchema>;
 
+const eylKnightStatusField = z.any().transform((v): "pending" | "documents" | "submitted" | "approved" | "rejected" => {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "documents" || s === "submitted" || s === "approved" || s === "rejected") return s;
+  return "pending";
+});
+
+export const eylKnightUpdateSchema = z.object({
+  status: eylKnightStatusField.optional(),
+  review_note: nstr,
+  knight_id: nuuid,
+  knight_role: roleField,
+});
+export type EylKnightUpdateInput = z.infer<typeof eylKnightUpdateSchema>;
+
 // ---- salaries --------------------------------------------------------------
 export const salarySchema = z.object({
   knight_id: z.string().uuid(),
