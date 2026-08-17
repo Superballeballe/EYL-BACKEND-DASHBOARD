@@ -1,9 +1,12 @@
-import { isAppOrderCancelled } from "@/lib/deliveryStatus";
+import { isAppOrderCancelled, isPurgedAppDelivery } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Delivery } from "@/lib/types";
 
 const APP_ORDER_SELECTS = [
-  "id, order_code, status, rider_name, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
+  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, invoices(payment_status)",
+  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at",
+  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
+  "id, order_code, status, scheduled_for, pickup_scheduled_at, delivery_scheduled_at",
   "id, order_code, status",
   "id, order_code",
 ];
@@ -64,13 +67,18 @@ export async function attachAppOrders<
     const stale = new Set(staleIds);
     return {
       error,
-      rows: enriched.map((row) =>
-        row.id && stale.has(row.id)
-          ? { ...row, fulfillment_status: "cancelled" as const, assignment_status: "cancelled" as const }
-          : row,
-      ),
+      rows: enriched
+        .map((row) =>
+          row.id && stale.has(row.id)
+            ? { ...row, fulfillment_status: "cancelled" as const, assignment_status: "cancelled" as const }
+            : row,
+        )
+        .filter((row) => !isPurgedAppDelivery(row)),
     };
   }
 
-  return { error, rows: enriched };
+  return {
+    error,
+    rows: enriched.filter((row) => !isPurgedAppDelivery(row)),
+  };
 }

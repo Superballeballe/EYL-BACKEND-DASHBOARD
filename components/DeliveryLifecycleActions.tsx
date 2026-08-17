@@ -34,10 +34,15 @@ type AppOrderSummary = {
   order_code?: string | null;
   status: string | null;
   rider_name?: string | null;
+  scheduled_for?: string | null;
   pickup_scheduled_at?: string | null;
   delivery_scheduled_at?: string | null;
   accepted_at?: string | null;
+  confirmed_at?: string | null;
   rider_assigned_at?: string | null;
+  pending_knight_id?: string | null;
+  payment_deadline_at?: string | null;
+  invoices?: { payment_status?: string | null }[] | { payment_status?: string | null } | null;
 };
 type DeliverySnapshot = {
   id: string;
@@ -52,6 +57,7 @@ type DeliverySnapshot = {
 };
 
 type ActionPayload =
+  | { action: "confirm" }
   | {
       action: "assign";
       knight_id: string | null;
@@ -123,6 +129,23 @@ function resolveScheduleInput(
   );
 }
 
+function appPickupSchedule(order?: AppOrderSummary | null) {
+  return order?.pickup_scheduled_at ?? order?.scheduled_for ?? null;
+}
+
+function appDeliverySchedule(order?: AppOrderSummary | null) {
+  if (order?.delivery_scheduled_at) return order.delivery_scheduled_at;
+  if (!order?.scheduled_for) return null;
+  const drop = new Date(order.scheduled_for);
+  drop.setMinutes(drop.getMinutes() + 90);
+  return drop.toISOString();
+}
+
+function appInvoicePaymentStatus(order?: AppOrderSummary | null) {
+  const invoice = Array.isArray(order?.invoices) ? order?.invoices[0] : order?.invoices;
+  return String(invoice?.payment_status ?? "pending").toLowerCase();
+}
+
 export default function DeliveryLifecycleActions({
   delivery,
   knights,
@@ -144,10 +167,10 @@ export default function DeliveryLifecycleActions({
   const [selectedKnightId, setSelectedKnightId] = useState(delivery.knight_id ?? "");
   const [customKnightName, setCustomKnightName] = useState(delivery.knight_id ? "" : delivery.knight_name ?? "");
   const [pickupAt, setPickupAt] = useState(
-    toDatetimeLocalValue(delivery.app_order?.pickup_scheduled_at, delivery.task_date),
+    toDatetimeLocalValue(appPickupSchedule(delivery.app_order), delivery.task_date),
   );
   const [deliveryAt, setDeliveryAt] = useState(
-    toDatetimeLocalValue(delivery.app_order?.delivery_scheduled_at, delivery.task_date),
+    toDatetimeLocalValue(appDeliverySchedule(delivery.app_order), delivery.task_date),
   );
   const [minPickupAt, setMinPickupAt] = useState(nowDatetimeLocalInput);
 
@@ -155,7 +178,16 @@ export default function DeliveryLifecycleActions({
   const appRank = statusRank[appStatus ?? ""] ?? 0;
   const isAppOrder = Boolean(delivery.app_order_id);
   const hasKnight = Boolean(delivery.knight_name?.trim() || delivery.knight_id);
-  const needsAssignmentConfirmation = isAppOrder && !hasKnight && appRank < statusRank.rider_assigned;
+  const isConfirmed = Boolean(
+    delivery.app_order?.confirmed_at
+    || delivery.app_order?.accepted_at
+    || appRank >= statusRank.accepted,
+  );
+  const isPaid = appInvoicePaymentStatus(delivery.app_order) === "paid";
+  const needsConfirmOrder = isAppOrder && !isConfirmed && appRank < statusRank.accepted;
+  const awaitingPayment = isAppOrder && isConfirmed && !isPaid && !hasKnight;
+  const canAssignKnight = isAppOrder && isConfirmed && isPaid && !hasKnight;
+  const needsAssignmentConfirmation = canAssignKnight || (!isAppOrder && !hasKnight && appRank < statusRank.rider_assigned);
   const isCancelled =
     isAppOrderCancelled(delivery.app_order) || delivery.fulfillment_status === "cancelled";
   const cancelledByApp =
@@ -166,13 +198,21 @@ export default function DeliveryLifecycleActions({
     return knights.find((knight) => knight.id === selectedKnightId)?.display_name ?? customKnightName.trim();
   }, [customKnightName, knights, selectedKnightId]);
 
-  const assignLabel = needsAssignmentConfirmation
+  const assignLabel = needsConfirmOrder
     ? compact
-      ? "Assign & start"
-      : "Assign knight & start"
-    : compact
-      ? "Assign"
-      : "Assign knight";
+      ? "Confirm"
+      : "Confirm order"
+    : awaitingPayment
+      ? compact
+        ? "Awaiting pay"
+        : "Awaiting payment"
+      : needsAssignmentConfirmation
+        ? compact
+          ? "Assign"
+          : "Assign knight"
+        : compact
+          ? "Assign"
+          : "Assign knight";
 
   async function run(payload: ActionPayload) {
     setBusyAction(payload.action);
@@ -202,6 +242,12 @@ export default function DeliveryLifecycleActions({
   }
 
   function openAssignment() {
+    if (needsConfirmOrder) {
+      run({ action: "confirm" });
+      return;
+    }
+    if (awaitingPayment) return;
+
     setError(null);
     setMinPickupAt(nowDatetimeLocalInput());
     setSelectedKnightId(delivery.knight_id ?? "");
@@ -211,7 +257,7 @@ export default function DeliveryLifecycleActions({
     const taskDate = delivery.task_date ?? null;
     setPickupAt(
       resolveScheduleInput(
-        delivery.app_order?.pickup_scheduled_at,
+        appPickupSchedule(delivery.app_order),
         delivery.pickup_time_window,
         taskDate,
         defaults.pickup,
@@ -219,7 +265,7 @@ export default function DeliveryLifecycleActions({
     );
     setDeliveryAt(
       resolveScheduleInput(
-        delivery.app_order?.delivery_scheduled_at,
+        appDeliverySchedule(delivery.app_order),
         delivery.drop_time_window,
         taskDate,
         defaults.drop,
@@ -281,12 +327,12 @@ export default function DeliveryLifecycleActions({
         {variant === "pending" ? (
           <Button
             size="small"
-            variant={needsAssignmentConfirmation ? "contained" : "outlined"}
-            disabled={busyAction !== null || isCancelled}
+            variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
+            disabled={busyAction !== null || isCancelled || awaitingPayment}
             onClick={openAssignment}
             sx={compactBtnSx}
           >
-            {assignLabel}
+            {busyAction === "confirm" ? "…" : assignLabel}
           </Button>
         ) : null}
 
@@ -329,12 +375,12 @@ export default function DeliveryLifecycleActions({
           <>
             <Button
               size="small"
-              variant={needsAssignmentConfirmation ? "contained" : "outlined"}
-              disabled={busyAction !== null || isCancelled}
+              variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
+              disabled={busyAction !== null || isCancelled || awaitingPayment}
               onClick={openAssignment}
               sx={compactBtnSx}
             >
-              {assignLabel}
+              {busyAction === "confirm" ? "…" : assignLabel}
             </Button>
             <Button
               size="small"

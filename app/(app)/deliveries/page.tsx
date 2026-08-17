@@ -51,6 +51,14 @@ export default async function DeliveriesPage({
   let query = db
     .from("deliveries")
     .select("*", { count: "exact" })
+    .or(
+      [
+        "app_order_id.not.is.null",
+        "fulfillment_status.neq.cancelled",
+        "mode_of_booking.neq.online",
+        "mode_of_booking.is.null",
+      ].join(","),
+    )
     .order("task_date", { ascending: false, nullsFirst: false })
     .order("serial_no", { ascending: true, nullsFirst: false })
     .range(offset, offset + LIMIT - 1);

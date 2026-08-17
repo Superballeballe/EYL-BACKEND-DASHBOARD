@@ -48,7 +48,17 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   try {
     await requireAdmin();
     const { id } = await params;
-    const { error } = await supabaseAdmin().from("deliveries").delete().eq("id", id);
+    const db = supabaseAdmin();
+
+    const { data: delivery, error: loadError } = await db
+      .from("deliveries")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (loadError) return serverError(loadError);
+    if (!delivery) return ok({ ok: true });
+
+    const { error } = await db.rpc("delete_delivery", { p_delivery_id: id });
     if (error) return serverError(error);
     return ok({ ok: true });
   } catch (e) {

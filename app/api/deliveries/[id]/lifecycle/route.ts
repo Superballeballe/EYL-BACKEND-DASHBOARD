@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
 import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
-import { sendOrderAssignedNotification } from "@/lib/server/expoPush";
+import { sendOrderAssignedNotification, sendPaymentWindowNotification } from "@/lib/server/expoPush";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -114,12 +114,33 @@ async function getKnightName(knightId: string | null | undefined, fallbackName: 
 
   const { data, error } = await supabaseAdmin()
     .from("knights")
-    .select("display_name")
+    .select("display_name, profile_id")
     .eq("id", knightId)
     .maybeSingle();
   if (error) throw new Error(error.message);
 
   return data?.display_name ?? cleanFallback;
+}
+
+async function getKnightProfileId(knightId: string | null | undefined) {
+  if (!knightId) return null;
+  const { data, error } = await supabaseAdmin()
+    .from("knights")
+    .select("profile_id")
+    .eq("id", knightId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.profile_id as string | null | undefined) ?? null;
+}
+
+async function getAppInvoicePaymentStatus(db: ReturnType<typeof supabaseAdmin>, orderId: string) {
+  const { data, error } = await db
+    .from("invoices")
+    .select("payment_status")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return String(data?.payment_status ?? "pending").toLowerCase();
 }
 
 function legacyOrderStatus(status: unknown) {
@@ -145,7 +166,7 @@ function stripNewOrderColumns(patch: OrderPatch) {
 
 async function updateLinkedOrder(db: ReturnType<typeof supabaseAdmin>, orderId: string, desiredPatch: OrderPatch) {
   const richSelectColumns =
-    "id, order_code, status, rider_name, accepted_at, rider_assigned_at, pickup_scheduled_at, delivery_scheduled_at";
+    "id, order_code, status, rider_name, accepted_at, rider_assigned_at, scheduled_for, pickup_scheduled_at, delivery_scheduled_at";
   const baseSelectColumns = "id, order_code, status";
   const update = async (patch: OrderPatch, selectColumns = richSelectColumns) =>
     db.from("orders").update(patch).eq("id", orderId).select(selectColumns).maybeSingle();
@@ -190,17 +211,53 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const stamp = nowIso();
 
     if (action.action === "confirm") {
-      return badRequest("Assign a knight before confirming the order.");
+      if (!linkedDelivery.app_order_id) {
+        return badRequest("This delivery has no linked app order.");
+      }
+
+      const { data: appOrder, error: orderError } = await db
+        .from("orders")
+        .select("status, confirmed_at")
+        .eq("id", linkedDelivery.app_order_id)
+        .maybeSingle();
+      if (orderError) return serverError(orderError);
+      if (isAppOrderCancelled(appOrder)) {
+        return badRequest("This app order was cancelled.");
+      }
+      if (appOrder?.confirmed_at) {
+        return badRequest("Order is already confirmed.");
+      }
+
+      const paymentStatus = await getAppInvoicePaymentStatus(db, linkedDelivery.app_order_id);
+      if (paymentStatus === "paid") {
+        return badRequest("Order is already paid.");
+      }
+
+      deliveryPatch.fulfillment_status = "accepted";
+      orderPatch.confirmed_at = stamp;
+      orderPatch.accepted_at = stamp;
+      orderPatch.status = "accepted";
     } else if (action.action === "assign") {
       if (linkedDelivery.app_order_id) {
         const { data: appOrder, error: orderError } = await db
           .from("orders")
-          .select("status")
+          .select("status, confirmed_at, assigned_knight_id, pending_knight_id")
           .eq("id", linkedDelivery.app_order_id)
           .maybeSingle();
         if (orderError) return serverError(orderError);
         if (isAppOrderCancelled(appOrder)) {
           return badRequest("This app order was cancelled — restore it before assigning a knight.");
+        }
+        if (!appOrder?.confirmed_at) {
+          return badRequest("Confirm the order first, then wait for customer payment.");
+        }
+
+        const paymentStatus = await getAppInvoicePaymentStatus(db, linkedDelivery.app_order_id);
+        if (paymentStatus !== "paid") {
+          return badRequest("Wait for customer payment before assigning a knight.");
+        }
+        if (appOrder.assigned_knight_id) {
+          return badRequest("A knight is already assigned to this order.");
         }
       }
 
@@ -229,6 +286,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
       orderPatch.rider_assigned_at = stamp;
       orderPatch.pickup_scheduled_at = action.pickup_scheduled_at ?? null;
       orderPatch.delivery_scheduled_at = action.delivery_scheduled_at ?? null;
+
+      const profileId = await getKnightProfileId(action.knight_id);
+      if (profileId) {
+        orderPatch.assigned_knight_id = profileId;
+      }
     } else if (action.action === "pickup") {
       deliveryPatch.fulfillment_status = "active";
       deliveryPatch.pickup_actual_time = nowClock();
@@ -238,9 +300,20 @@ export async function PATCH(req: Request, { params }: Ctx) {
       deliveryPatch.drop_actual_time = nowClock();
       orderPatch.status = "delivered";
     } else if (action.action === "cancel") {
-      deliveryPatch.assignment_status = "cancelled";
-      deliveryPatch.fulfillment_status = "cancelled";
-      orderPatch.status = "cancelled";
+      if (!linkedDelivery.app_order_id) {
+        deliveryPatch.assignment_status = "cancelled";
+        deliveryPatch.fulfillment_status = "cancelled";
+      }
+    }
+
+    if (action.action === "cancel" && linkedDelivery.app_order_id) {
+      const { error: purgeError } = await db.rpc("purge_app_order", {
+        p_order_id: linkedDelivery.app_order_id,
+      });
+      if (purgeError) return serverError(purgeError);
+      const { data, error } = await db.from("deliveries").select().eq("id", id).maybeSingle();
+      if (error) return serverError(error);
+      return ok({ ok: true, delivery: data, app_order: null });
     }
 
     let updatedDelivery = null;
@@ -261,13 +334,22 @@ export async function PATCH(req: Request, { params }: Ctx) {
       if (error) return serverError(error);
       updatedOrder = data;
 
-      if (action.action === "assign") {
+      if (action.action === "confirm") {
+        try {
+          await sendPaymentWindowNotification(db, {
+            orderId: linkedDelivery.app_order_id,
+          });
+        } catch (error) {
+          console.warn("[notifications] failed to send payment window push:", error);
+        }
+      } else if (action.action === "assign") {
         try {
           await sendOrderAssignedNotification(db, {
             orderId: linkedDelivery.app_order_id,
             knightName: orderPatch.rider_name as string,
             pickupScheduledAt: orderPatch.pickup_scheduled_at as string | null | undefined,
             deliveryScheduledAt: orderPatch.delivery_scheduled_at as string | null | undefined,
+            paymentDue: false,
           });
         } catch (error) {
           console.warn("[notifications] failed to send assignment push:", error);
