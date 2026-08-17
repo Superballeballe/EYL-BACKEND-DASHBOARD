@@ -2,10 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Box,
+  Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -16,6 +24,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { EmptyState } from "@/components/ui";
@@ -33,11 +42,30 @@ const STATUS_COLOR: Record<EylKnight["status"], "default" | "warning" | "info" |
 };
 
 export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[] }) {
+  const router = useRouter();
   const [status, setStatus] = useState("all");
+  const [deleteTarget, setDeleteTarget] = useState<EylKnight | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return applicants.filter((row) => status === "all" || row.status === status);
   }, [applicants, status]);
+
+  async function removeApplicant() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await fetch(`/api/eyl-knights/${deleteTarget.id}`, { method: "DELETE" });
+    setDeleting(false);
+    if (res.ok) {
+      setDeleteTarget(null);
+      router.refresh();
+      return;
+    }
+    const d = await res.json().catch(() => ({}));
+    setDeleteError(d.error || "Delete failed");
+  }
 
   return (
     <Box>
@@ -118,9 +146,24 @@ export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[
                   </TableCell>
                   <TableCell>{row.submitted_at ? fmtDate(row.submitted_at) : "—"}</TableCell>
                   <TableCell align="right">
-                    <Link href={`/eyl-knights/${row.id}`} style={{ fontWeight: 600, fontSize: "0.875rem" }}>
-                      Review
-                    </Link>
+                    <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end", alignItems: "center" }}>
+                      <Link href={`/eyl-knights/${row.id}`} style={{ fontWeight: 600, fontSize: "0.875rem" }}>
+                        Review
+                      </Link>
+                      <Tooltip title="Remove application">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          aria-label={`Remove ${row.name || "applicant"}`}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTarget(row);
+                          }}
+                        >
+                          <DeleteOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -128,6 +171,29 @@ export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[
           </Table>
         </TableContainer>
       )}
+
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Remove application?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            {deleteTarget?.name || "This applicant"} will be removed from the review queue.
+            {deleteTarget?.knight_id ? " Their ops roster entry will stay." : ""}
+          </Typography>
+          {deleteError ? (
+            <Typography variant="body2" color="error" sx={{ mt: 1.5 }}>
+              {deleteError}
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button color="error" variant="contained" onClick={removeApplicant} disabled={deleting}>
+            {deleting ? "Removing…" : "Remove"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

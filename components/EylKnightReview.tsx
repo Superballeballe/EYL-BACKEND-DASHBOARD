@@ -64,22 +64,42 @@ export default function EylKnightReview({
   const [note, setNote] = useState(applicant.review_note ?? "");
   const [role, setRole] = useState<"walker" | "biker">(applicant.knight_role ?? "walker");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isFinal = applicant.status === "approved" || applicant.status === "rejected";
 
-  async function updateStatus(status: "approved" | "rejected") {
-    if (status === "rejected" && !window.confirm("Reject this applicant? They will not be added to the roster.")) {
+  async function handleReject() {
+    if (
+      !window.confirm(
+        "Reject this applicant? They will not be added to the roster and the application will be removed.",
+      )
+    ) {
       return;
     }
 
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/eyl-knights/${applicant.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error || "Reject failed");
+      router.push("/eyl-knights");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reject applicant");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleApprove() {
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/eyl-knights/${applicant.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, review_note: note || null, knight_role: role }),
+        body: JSON.stringify({ status: "approved", review_note: note || null, knight_role: role }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Update failed");
       router.refresh();
@@ -87,6 +107,30 @@ export default function EylKnightReview({
       setError(e instanceof Error ? e.message : "Could not update applicant");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    const rosterNote = applicant.knight_id ? " Their ops roster entry will stay." : "";
+    if (
+      !window.confirm(
+        `Delete this application? ${applicant.name || "This applicant"} will be removed from the review queue.${rosterNote}`,
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/eyl-knights/${applicant.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error || "Delete failed");
+      router.push("/eyl-knights");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete applicant");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -274,21 +318,27 @@ export default function EylKnightReview({
           <Button
             variant="contained"
             color="success"
-            disabled={saving}
-            onClick={() => updateStatus("approved")}
+            disabled={saving || deleting}
+            onClick={handleApprove}
           >
             {saving ? "Saving…" : "Approve & add to roster"}
           </Button>
           <Button
             variant="outlined"
             color="error"
-            disabled={saving}
-            onClick={() => updateStatus("rejected")}
+            disabled={saving || deleting}
+            onClick={handleReject}
           >
-            Reject
+            {deleting ? "Removing…" : "Reject & remove"}
           </Button>
         </Stack>
-      ) : null}
+      ) : (
+        <Box>
+          <Button variant="outlined" color="error" disabled={saving || deleting} onClick={handleDelete}>
+            {deleting ? "Deleting…" : "Delete application"}
+          </Button>
+        </Box>
+      )}
     </Stack>
   );
 }

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { eylKnightUpdateSchema } from "@/lib/schemas";
-import { approveEylKnight, rejectEylKnight } from "@/lib/server/eylKnights";
+import { approveEylKnight, deleteEylKnight, rejectEylKnight } from "@/lib/server/eylKnights";
 import { notFound, ok, parseBody, serverError } from "@/lib/api";
 import type { EylKnight } from "@/lib/types";
 
@@ -63,6 +63,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (error) return serverError(error);
     if (!data) return notFound("Applicant not found");
     return ok(data);
+  } catch (e) {
+    return serverError(e);
+  }
+}
+
+export async function DELETE(_req: Request, { params }: Ctx) {
+  try {
+    const { id } = await params;
+    const deleted = await deleteEylKnight(id);
+    if (!deleted) return notFound("Applicant not found");
+    return ok({ ok: true });
   } catch (e) {
     return serverError(e);
   }

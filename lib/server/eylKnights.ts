@@ -2,6 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { invalidateRoster } from "@/lib/server/roster";
 import type { EylKnight } from "@/lib/types";
 
+const DOC_BUCKET = "knight-documents";
+
 function displayNameFromApplicant(applicant: EylKnight) {
   const parts = (applicant.name ?? "").trim().split(/\s+/).filter(Boolean);
   return parts[0] ?? "Knight";
@@ -77,4 +79,27 @@ export async function rejectEylKnight(applicantId: string, reviewNote: string | 
   if (error) throw error;
   if (!data) throw new Error("Applicant not found");
   return data;
+}
+
+export async function deleteEylKnight(applicantId: string) {
+  const db = supabaseAdmin();
+  const { data: applicant, error: loadError } = await db
+    .from("eyl_knights")
+    .select("*")
+    .eq("id", applicantId)
+    .maybeSingle();
+  if (loadError) throw loadError;
+  if (!applicant) return false;
+
+  const paths = Object.values((applicant as EylKnight).documents ?? {}).filter(
+    (path): path is string => Boolean(path && !path.startsWith("http") && !path.startsWith("test://")),
+  );
+  if (paths.length) {
+    const { error: storageError } = await db.storage.from(DOC_BUCKET).remove(paths);
+    if (storageError) console.warn("[eyl-knights] document cleanup failed:", storageError.message);
+  }
+
+  const { error } = await db.from("eyl_knights").delete().eq("id", applicantId);
+  if (error) throw error;
+  return true;
 }
