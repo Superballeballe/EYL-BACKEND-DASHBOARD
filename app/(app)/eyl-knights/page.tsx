@@ -17,8 +17,8 @@ export default async function EylKnightsPage() {
   return (
     <div>
       <PageHeader
-        title="EYL Knights"
-        subtitle={`${applicants.length} app applicants`}
+        title="Approve new knights"
+        subtitle={`${applicants.length} applicant${applicants.length === 1 ? "" : "s"}`}
       />
       <EylKnightsBoard applicants={applicants} />
     </div>

@@ -39,7 +39,7 @@ const LINKS = [
   { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
   { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
   { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
-  { href: "/eyl-knights", label: "EYL Knights", Icon: TwoWheelerOutlinedIcon },
+  { href: "/eyl-knights", label: "Approve new knights", Icon: TwoWheelerOutlinedIcon },
   { href: "/salaries", label: "Salaries", Icon: BadgeOutlinedIcon },
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },

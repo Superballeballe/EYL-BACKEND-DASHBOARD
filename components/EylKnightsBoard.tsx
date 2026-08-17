@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { formatWorkAreas } from "@/lib/workAreas";
 import { tableShellSx } from "@/lib/surface";
 import type { EylKnight } from "@/lib/types";
 
@@ -112,7 +113,9 @@ export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[
                       variant={row.status === "pending" ? "outlined" : "filled"}
                     />
                   </TableCell>
-                  <TableCell>{row.work_areas?.length ? row.work_areas.join(", ") : "—"}</TableCell>
+                  <TableCell sx={{ maxWidth: 240 }}>
+                    {row.work_areas?.length ? formatWorkAreas(row.work_areas).join(", ") : "—"}
+                  </TableCell>
                   <TableCell>{row.submitted_at ? fmtDate(row.submitted_at) : "—"}</TableCell>
                   <TableCell align="right">
                     <Link href={`/eyl-knights/${row.id}`} style={{ fontWeight: 600, fontSize: "0.875rem" }}>
