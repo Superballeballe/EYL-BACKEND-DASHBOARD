@@ -152,6 +152,7 @@ export default function DeliveryLifecycleActions({
   compact = false,
   variant = "default",
   onUpdated,
+  onEditFull,
 }: {
   delivery: DeliverySnapshot;
   knights: KnightOpt[];
@@ -159,6 +160,8 @@ export default function DeliveryLifecycleActions({
   /** pending = assign only; running = edit + pickup/done by stage; default = all actions */
   variant?: "default" | "pending" | "running";
   onUpdated?: (result: LifecycleResult) => void;
+  /** running variant only: open the full order form (edit + delete) instead of the knight/schedule dialog */
+  onEditFull?: () => void;
 }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<ActionPayload["action"] | null>(null);
@@ -246,7 +249,10 @@ export default function DeliveryLifecycleActions({
       run({ action: "confirm" });
       return;
     }
-    if (awaitingPayment) return;
+    if (awaitingPayment) {
+      setError("Waiting for customer payment before a knight can be assigned.");
+      return;
+    }
 
     setError(null);
     setMinPickupAt(nowDatetimeLocalInput());
@@ -342,12 +348,22 @@ export default function DeliveryLifecycleActions({
               size="small"
               variant="outlined"
               disabled={busyAction !== null || isCancelled}
-              onClick={openAssignment}
+              onClick={onEditFull ?? openAssignment}
               sx={compactBtnSx}
             >
               Edit
             </Button>
-            {isPickedUp ? (
+            {!hasKnight ? (
+              <Button
+                size="small"
+                variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
+                disabled={busyAction !== null || isCancelled || awaitingPayment}
+                onClick={openAssignment}
+                sx={compactBtnSx}
+              >
+                {busyAction === "confirm" ? "…" : assignLabel}
+              </Button>
+            ) : isPickedUp ? (
               <Button
                 size="small"
                 variant="contained"

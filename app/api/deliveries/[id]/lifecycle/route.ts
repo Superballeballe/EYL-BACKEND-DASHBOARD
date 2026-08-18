@@ -31,6 +31,8 @@ type DeliveryLink = {
   app_order_id: string | null;
   task_date: string | null;
   fulfillment_status: string | null;
+  knight_id: string | null;
+  knight_name: string | null;
 };
 type OrderPatch = Record<string, unknown>;
 
@@ -196,7 +198,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const db = supabaseAdmin();
     const { data: delivery, error: deliveryError } = await db
       .from("deliveries")
-      .select("id, app_order_id, task_date, fulfillment_status")
+      .select("id, app_order_id, task_date, fulfillment_status, knight_id, knight_name")
       .eq("id", id)
       .maybeSingle();
 
@@ -292,10 +294,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
         orderPatch.assigned_knight_id = profileId;
       }
     } else if (action.action === "pickup") {
+      if (!linkedDelivery.knight_id && !linkedDelivery.knight_name?.trim()) {
+        return badRequest("Assign a knight before marking this delivery picked up.");
+      }
+      if (linkedDelivery.fulfillment_status !== "accepted") {
+        return badRequest("This delivery is not ready for pickup.");
+      }
       deliveryPatch.fulfillment_status = "active";
       deliveryPatch.pickup_actual_time = nowClock();
       orderPatch.status = "picked_up";
     } else if (action.action === "deliver") {
+      if (linkedDelivery.fulfillment_status !== "active") {
+        return badRequest("This delivery has not been picked up yet.");
+      }
       deliveryPatch.fulfillment_status = "completed";
       deliveryPatch.drop_actual_time = nowClock();
       orderPatch.status = "delivered";
