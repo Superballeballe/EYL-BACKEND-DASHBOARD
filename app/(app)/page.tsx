@@ -9,7 +9,7 @@ import { getSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fmtDate, todayISO } from "@/lib/format";
 import type { ChartBundle, MonthPoint } from "@/components/BusinessOverview";
-import type { Delivery, WorkDay } from "@/lib/types";
+import type { Delivery, DraftOrder, WorkDay } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ function buildCharts(rows: PeriodRow[], today: string): ChartBundle {
 async function getData(today: string) {
   const yearStart = `${today.slice(0, 4)}-01-01`;
   const db = supabaseAdmin();
-  const [del, wd, unpaid, review, periodRows, pending, running, formOpts] =
+  const [del, wd, unpaid, review, periodRows, pending, running, draft, formOpts] =
     await Promise.all([
       db
         .from("deliveries")
@@ -131,6 +131,13 @@ async function getData(today: string) {
         .neq("assignment_status", "cancelled")
         .order("updated_at", { ascending: false })
         .limit(80),
+      db
+        .from("orders")
+        .select("id, order_code, pickup_address, delivery_address, recipient_name, total_price, expires_at, draft_reverted_at")
+        .eq("status", "draft")
+        .not("draft_reverted_at", "is", null)
+        .order("draft_reverted_at", { ascending: false })
+        .limit(80),
       getDeliveryFormOptions(),
     ]);
 
@@ -150,6 +157,7 @@ async function getData(today: string) {
   ]);
 
   const activePending = pendingOrders.filter((d) => !isAppOrderCancelled(d.app_order));
+  const draftOrders = (draft.data ?? []) as DraftOrder[];
 
   return {
     deliveries: (del.data ?? []) as Delivery[],
@@ -157,6 +165,7 @@ async function getData(today: string) {
     unpaidCount: unpaid.count ?? 0,
     reviewCount: review.count ?? 0,
     pendingOrders: activePending,
+    draftOrders,
     runningOrders,
     knights: formOpts.knights as { id: string; display_name: string }[],
     clients: formOpts.clients,
@@ -201,6 +210,7 @@ export default async function Dashboard() {
     reviewCount,
     period,
     pendingOrders,
+    draftOrders,
     runningOrders,
     knights,
     clients,
@@ -237,6 +247,7 @@ export default async function Dashboard() {
         period={period}
         revenue={revenue}
         pendingOrders={pendingOrders}
+        draftOrders={draftOrders}
         runningOrders={runningOrders}
         knights={knights}
         clients={clients}

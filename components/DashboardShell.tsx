@@ -18,9 +18,10 @@ import {
 } from "@mui/material";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
+import DraftsIcon from "@mui/icons-material/Drafts";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
@@ -28,7 +29,7 @@ import BusinessOverview, { type ChartBundle } from "@/components/BusinessOvervie
 import { fmtDatetimeLocal, money, routeAreaLabel } from "@/lib/format";
 import { formatDeliveryOrderId } from "@/lib/serial";
 import { gray, tableShellSx } from "@/lib/surface";
-import type { Delivery, WorkDay } from "@/lib/types";
+import type { Delivery, DraftOrder, WorkDay } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
 type ClientOpt = {
@@ -58,6 +59,7 @@ type Props = {
   period: Period;
   revenue: number;
   pendingOrders: Delivery[];
+  draftOrders: DraftOrder[];
   runningOrders: Delivery[];
   knights: KnightOpt[];
   clients: ClientOpt[];
@@ -194,6 +196,7 @@ function OrdersTable({
                   knights={knights}
                   compact
                   variant={mode === "pending" ? "pending" : "running"}
+                  onEditFull={() => onPreview(d)}
                 />
               </TableCell>
             </TableRow>
@@ -260,6 +263,102 @@ function OrdersPanel({
   );
 }
 
+function DraftOrdersTable({ rows, emptyMessage }: { rows: DraftOrder[]; emptyMessage: string }) {
+  if (rows.length === 0) {
+    return (
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 200,
+          borderRadius: 1,
+          border: `1px dashed ${gray.border}`,
+          bgcolor: gray.surface,
+        }}
+      >
+        <EmptyState message={emptyMessage} compact />
+      </Box>
+    );
+  }
+
+  return (
+    <TableContainer sx={{ ...tableShellSx, overflowX: "auto" }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Order · route</TableCell>
+            <TableCell>Recipient</TableCell>
+            <TableCell sx={{ width: "6rem" }} align="right">
+              Price
+            </TableCell>
+            <TableCell sx={{ width: "12rem" }} align="right">
+              Retry window
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((o) => (
+            <TableRow key={o.id}>
+              <TableCell sx={{ verticalAlign: "top", py: 1.25 }}>
+                <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                  {o.order_code ?? "—"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+                  {(o.pickup_address ?? "—") + " → " + (o.delivery_address ?? "—")}
+                </Typography>
+              </TableCell>
+              <TableCell sx={{ verticalAlign: "top", pt: 1.5 }}>
+                <Typography variant="body2">{o.recipient_name ?? "—"}</Typography>
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ verticalAlign: "top", pt: 1.5, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+              >
+                {money(o.total_price)}
+              </TableCell>
+              <TableCell align="right" sx={{ verticalAlign: "top", pt: 1.5 }}>
+                <Typography variant="body2">
+                  {o.expires_at ? `Until ${fmtDatetimeLocal(o.expires_at)}` : "Expired"}
+                </Typography>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function DraftOrdersPanel({ rows }: { rows: DraftOrder[] }) {
+  return (
+    <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", pb: 2 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2, flexShrink: 0 }}
+        >
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <DraftsIcon color="primary" fontSize="small" />
+              <Typography variant="h2">Draft orders</Typography>
+            </Stack>
+            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
+              Confirmed, but the customer didn&apos;t pay in time — the app reverted these to draft so they can retry.
+            </Typography>
+          </Box>
+          <Chip variant="outlined" color="primary" label={`${rows.length} draft`} />
+        </Stack>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <DraftOrdersTable rows={rows} emptyMessage="No draft orders — nothing has gone unpaid." />
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DashboardShell(props: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
@@ -274,6 +373,7 @@ export default function DashboardShell(props: Props) {
     period,
     revenue,
     pendingOrders,
+    draftOrders,
     runningOrders,
     knights,
     clients,
@@ -283,8 +383,33 @@ export default function DashboardShell(props: Props) {
   } = props;
 
   const pendingCount = pendingOrders.length;
+  const draftCount = draftOrders.length;
   const runningCount = runningOrders.length;
   const bothEmpty = pendingCount === 0 && runningCount === 0;
+
+  const lastSignal = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await fetch("/api/deliveries/signal", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const { signal } = (await res.json()) as { signal: string };
+        if (lastSignal.current !== null && signal !== lastSignal.current) {
+          router.refresh();
+        }
+        lastSignal.current = signal;
+      } catch {
+        // ignore — next tick retries
+      }
+    }
+    poll();
+    const id = setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [router]);
 
   return (
     <Box>
@@ -302,6 +427,16 @@ export default function DashboardShell(props: Props) {
               {pendingCount + runningCount > 0 ? (
                 <Chip size="small" color="primary" label={pendingCount + runningCount} />
               ) : null}
+            </Stack>
+          }
+        />
+        <Tab
+          icon={<DraftsIcon fontSize="small" />}
+          iconPosition="start"
+          label={
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <span>Draft orders</span>
+              {draftCount > 0 ? <Chip size="small" color="primary" label={draftCount} /> : null}
             </Stack>
           }
         />
@@ -369,6 +504,19 @@ export default function DashboardShell(props: Props) {
       )}
 
       {tab === 1 && (
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2.5,
+            gridTemplateColumns: "1fr",
+            minHeight: { lg: 360 },
+          }}
+        >
+          <DraftOrdersPanel rows={draftOrders} />
+        </Box>
+      )}
+
+      {tab === 2 && (
         <BusinessOverview
           viewDate={viewDate}
           periodStart={periodStart}

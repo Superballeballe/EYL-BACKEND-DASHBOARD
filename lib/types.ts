@@ -209,3 +209,20 @@ export type Delivery = {
   created_at: string;
   updated_at: string;
 };
+
+/**
+ * An app order that was confirmed/assigned, then reverted to "draft" by the
+ * app's own payment-expiry sweep because the customer never paid in time.
+ * Has no linked `deliveries` row — the sweep detaches it — so it's read from
+ * `orders` directly, not the deliveries table.
+ */
+export type DraftOrder = {
+  id: string;
+  order_code: string | null;
+  pickup_address: string | null;
+  delivery_address: string | null;
+  recipient_name: string | null;
+  total_price: number | null;
+  expires_at: string | null;
+  draft_reverted_at: string | null;
+};
