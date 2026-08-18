@@ -212,6 +212,10 @@ ref,
     return formatSerialCode(bookingMode === "online" ? "online" : "b2b", n, null);
   }, [bookingMode, serialNo]);
 
+  const pickupLocked =
+    mode === "edit" &&
+    (initial?.fulfillment_status === "active" || initial?.fulfillment_status === "completed");
+
   const editSerialCode = useMemo(() => {
     if (mode !== "edit" || initial?.serial_no == null) return null;
     return formatSerialCode(
@@ -434,9 +438,15 @@ ref,
                   setValue("pickup_lng", coords?.lng ?? null);
                 }}
                 placeholder="Search pickup address"
+                disabled={pickupLocked}
               />
             )}
           />
+          {pickupLocked ? (
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              Pickup already happened — this delivery has been picked up, so the pickup address is locked.
+            </p>
+          ) : null}
           <FieldError message={errors.pickup_location?.message as string | undefined} />
         </Field>
         <Field label="Pickup scheduled" required>

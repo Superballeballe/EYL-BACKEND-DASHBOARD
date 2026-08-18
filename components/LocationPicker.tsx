@@ -16,12 +16,14 @@ export default function LocationPicker({
   lng,
   onChange,
   placeholder = "Search address on Google Maps",
+  disabled = false,
 }: {
   value: string;
   lat?: number | null;
   lng?: number | null;
   onChange: (address: string, coords?: LatLng | null) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
@@ -162,6 +164,7 @@ export default function LocationPicker({
           value={value}
           onChange={(e) => onChange(e.target.value, null)}
           placeholder={placeholder}
+          disabled={disabled}
         />
         {!hasGoogleMapsKey() ? (
           <p className="mt-1 text-xs text-[var(--muted-foreground)]">
@@ -190,6 +193,7 @@ export default function LocationPicker({
         }}
         placeholder={ready ? placeholder : "Loading maps…"}
         autoComplete="off"
+        disabled={disabled}
       />
       {open && suggestions.length > 0 ? (
         <ul
