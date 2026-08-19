@@ -41,6 +41,152 @@ type DeliveryLink = {
 };
 type OrderPatch = Record<string, unknown>;
 
+const DELIVERY_LINK_SELECT =
+  "id, app_order_id, task_date, fulfillment_status, knight_id, knight_name";
+
+async function loadLinkedDelivery(db: ReturnType<typeof supabaseAdmin>, id: string) {
+  const { data, error } = await db
+    .from("deliveries")
+    .select(DELIVERY_LINK_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data as DeliveryLink;
+
+  // ponytail: stale tabs sometimes still hold the app order id after a resync.
+  const { data: byOrder, error: byOrderError } = await db
+    .from("deliveries")
+    .select(DELIVERY_LINK_SELECT)
+    .eq("app_order_id", id)
+    .maybeSingle();
+  if (byOrderError) throw byOrderError;
+  return (byOrder as DeliveryLink | null) ?? null;
+}
+
+async function cancelAppOrderFromDashboard(
+  db: ReturnType<typeof supabaseAdmin>,
+  delivery: DeliveryLink,
+) {
+  const orderId = delivery.app_order_id;
+  if (!orderId) throw new Error("Linked app order is missing");
+
+  const { data: order, error: orderError } = await db
+    .from("orders")
+    .select(
+      "id, order_code, user_id, status, confirmed_at, assigned_knight_id, pending_knight_id, assigned_at, rider_assigned_at, pickup_address, delivery_address",
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+  if (orderError) throw new Error(orderError.message);
+  if (!order) throw new Error("Linked app order not found");
+  if (isAppOrderCancelled(order)) throw new Error("This app order was already cancelled.");
+
+  const status = String(order.status ?? "").toLowerCase();
+  if (["picked_up", "in_transit", "delivered"].includes(status)) {
+    throw new Error("Cannot cancel after pickup — contact support.");
+  }
+
+  const { data: invoice, error: invoiceError } = await db
+    .from("invoices")
+    .select("payment_status, total_amount, metadata")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (invoiceError) throw new Error(invoiceError.message);
+
+  const paid = String(invoice?.payment_status ?? "").toLowerCase() === "paid";
+  const total = Math.round(Number(invoice?.total_amount ?? 0));
+  const fee = paid ? Math.round(total * 0.1) : 0;
+  const refund = paid ? Math.max(total - fee, 0) : 0;
+  const refundStatus = paid && refund > 0 ? "pending" : "none";
+  const wasConfirmed = Boolean(
+    order.confirmed_at ||
+      order.assigned_knight_id ||
+      order.pending_knight_id ||
+      order.assigned_at ||
+      order.rider_assigned_at ||
+      ["confirmed", "accepted", "assigned", "rider_assigned"].includes(status),
+  );
+
+  const { data: existingCancelled } = await db
+    .from("cancelled_orders")
+    .select("id")
+    .eq("order_id", orderId)
+    .maybeSingle();
+
+  if (!existingCancelled) {
+    const { error: insertError } = await db.from("cancelled_orders").insert({
+      order_id: orderId,
+      order_code: order.order_code,
+      user_id: order.user_id,
+      reason_code: "other",
+      reason_label: "Cancelled from dashboard",
+      reason_note: "Cancelled by operations team",
+      was_confirmed: wasConfirmed,
+      payment_status: invoice?.payment_status ?? null,
+      total_amount: total,
+      cancellation_fee: fee,
+      refund_amount: refund,
+      refund_status: refundStatus,
+      pickup_address: order.pickup_address,
+      delivery_address: order.delivery_address,
+    });
+    if (insertError) throw new Error(insertError.message);
+  }
+
+  const { error: orderUpdateError } = await db
+    .from("orders")
+    .update({ status: "cancelled" })
+    .eq("id", orderId);
+  if (orderUpdateError) throw new Error(orderUpdateError.message);
+
+  if (order.assigned_knight_id) {
+    const { data: profile } = await db
+      .from("profiles")
+      .select("orders_today")
+      .eq("id", order.assigned_knight_id)
+      .maybeSingle();
+    if (profile && (profile.orders_today ?? 0) > 0) {
+      await db
+        .from("profiles")
+        .update({ orders_today: Math.max(0, (profile.orders_today ?? 0) - 1) })
+        .eq("id", order.assigned_knight_id);
+    }
+  }
+
+  if (paid && invoice) {
+    const meta = {
+      ...((invoice.metadata as Record<string, unknown> | null) ?? {}),
+      refund_status: refundStatus,
+      refund_amount: refund,
+      cancellation_fee: fee,
+      cancellation_fee_percent: 10,
+      cancel_reason_code: "other",
+      cancel_reason: "Cancelled from dashboard",
+      cancelled_at: nowIso(),
+    };
+    await db.from("invoices").update({ metadata: meta }).eq("order_id", orderId);
+  }
+
+  const { data: updatedDelivery, error: deliveryError } = await db
+    .from("deliveries")
+    .update({
+      fulfillment_status: "cancelled",
+      assignment_status: "cancelled",
+    })
+    .eq("id", delivery.id)
+    .select()
+    .maybeSingle();
+  if (deliveryError) throw new Error(deliveryError.message);
+
+  const { data: updatedOrder } = await db
+    .from("orders")
+    .select("id, order_code, status")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  return { delivery: updatedDelivery, app_order: updatedOrder };
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -200,17 +346,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
   try {
     const { id } = await params;
     const db = supabaseAdmin();
-    const { data: delivery, error: deliveryError } = await db
-      .from("deliveries")
-      .select("id, app_order_id, task_date, fulfillment_status, knight_id, knight_name")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (deliveryError) return serverError(deliveryError);
-    if (!delivery) return notFound("Delivery not found");
+    let linkedDelivery: DeliveryLink;
+    try {
+      const delivery = await loadLinkedDelivery(db, id);
+      if (!delivery) return notFound("Delivery not found");
+      linkedDelivery = delivery;
+    } catch (deliveryError) {
+      return serverError(deliveryError);
+    }
 
     const action = parsed.data;
-    const linkedDelivery = delivery as DeliveryLink;
 
     const deliveryPatch: Record<string, unknown> = {};
     const orderPatch: Record<string, unknown> = {};
@@ -322,13 +467,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
     }
 
     if (action.action === "cancel" && linkedDelivery.app_order_id) {
-      const { error: purgeError } = await db.rpc("purge_app_order", {
-        p_order_id: linkedDelivery.app_order_id,
-      });
-      if (purgeError) return serverError(purgeError);
-      const { data, error } = await db.from("deliveries").select().eq("id", id).maybeSingle();
-      if (error) return serverError(error);
-      return ok({ ok: true, delivery: data, app_order: null });
+      try {
+        const cancelled = await cancelAppOrderFromDashboard(db, linkedDelivery);
+        return ok({ ok: true, ...cancelled });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not cancel order";
+        if (/already cancelled/i.test(message)) return badRequest(message);
+        if (/not found/i.test(message)) return notFound(message);
+        return serverError(error);
+      }
     }
 
     let updatedDelivery = null;
@@ -336,7 +483,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
       const { data, error } = await db
         .from("deliveries")
         .update(deliveryPatch)
-        .eq("id", id)
+        .eq("id", linkedDelivery.id)
         .select()
         .maybeSingle();
       if (error) return serverError(error);

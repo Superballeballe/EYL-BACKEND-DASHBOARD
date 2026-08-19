@@ -229,6 +229,11 @@ export default function DeliveryLifecycleActions({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (res.status === 404) {
+          setError("This delivery is no longer available — refreshing…");
+          router.refresh();
+          return;
+        }
         setError(data.error || "Action failed");
         return;
       }
