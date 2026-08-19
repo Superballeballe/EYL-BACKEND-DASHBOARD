@@ -19,7 +19,7 @@ export default async function CancelledOrdersPage() {
     <div>
       <PageHeader
         title="Cancelled orders"
-        subtitle="Customer cancellations with reason. Pending refunds can be paid back through Razorpay from this table."
+        subtitle="Customer cancellations with reason. Pending refunds are processed automatically; use Refund to retry manually."
       />
       <CancelledOrdersTable rows={rows} />
     </div>

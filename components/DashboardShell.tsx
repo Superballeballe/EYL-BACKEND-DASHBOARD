@@ -497,17 +497,22 @@ export default function DashboardShell(props: Props) {
 
   useEffect(() => {
     let debounce: ReturnType<typeof setTimeout> | null = null;
-    const es = new EventSource("/api/deliveries/stream");
-
-    const onChange = () => {
+    const refresh = () => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => router.refresh(), 300);
     };
 
-    es.addEventListener("change", onChange);
+    const deliveries = new EventSource("/api/deliveries/stream");
+    deliveries.addEventListener("change", refresh);
+
+    const refunds = new EventSource("/api/refunds/stream");
+    refunds.addEventListener("change", refresh);
+    refunds.addEventListener("processed", refresh);
+
     return () => {
       if (debounce) clearTimeout(debounce);
-      es.close();
+      deliveries.close();
+      refunds.close();
     };
   }, [router]);
 

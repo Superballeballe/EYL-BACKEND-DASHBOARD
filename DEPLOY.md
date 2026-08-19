@@ -77,6 +77,29 @@ docker compose --env-file .env.local down
 - **Security headers** both at the app (`next.config.mjs`) and the edge (Caddy), plus HSTS over TLS.
 - Secrets via `env_file` at runtime; `NEXT_PUBLIC_*` also passed as **build args** so the client bundle gets Maps/Supabase public config. `.dockerignore` keeps `.env*` out of the build context.
 
+## Auto-refund queue
+
+When a cancellation sets `refund_status = pending`, the dashboard SSE queue
+(`/api/refunds/stream`) picks it up and processes refunds automatically while
+an ops user has the dashboard open. Every attempt is logged in `refund_events`.
+
+For coverage when nobody is logged in, add a cron on the host (every 2–5 min):
+
+```bash
+# /etc/cron.d/eyl-refunds — replace DOMAIN and API_KEY
+*/3 * * * * root curl -sf -X POST \
+  -H "x-api-key: YOUR_API_KEY" \
+  "https://DASHBOARD_DOMAIN/api/refunds/process-pending?limit=20" \
+  > /dev/null
+```
+
+Manual trigger (signed-in session or same `x-api-key`):
+
+```bash
+curl -X POST -H "x-api-key: $API_KEY" \
+  "https://dashboard.example.com/api/refunds/process-pending?limit=20"
+```
+
 ## Before this is truly production-ready
 
 This setup hardens the *container/deploy* layer. Still outstanding (see the repo
