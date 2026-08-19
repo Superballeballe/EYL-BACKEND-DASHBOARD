@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
 
 type InvoicePay = {
+  provider: string | null;
   provider_ref: string | null;
   metadata: Record<string, unknown> | null;
 };
@@ -16,7 +17,10 @@ function razorpayPaymentId(invoice: InvoicePay | null) {
   const meta = invoice?.metadata && typeof invoice.metadata === "object" ? invoice.metadata : {};
   const fromMeta = typeof meta.razorpay_payment_id === "string" ? meta.razorpay_payment_id : "";
   const ref = String(invoice?.provider_ref || fromMeta || "").trim();
-  return ref.startsWith("pay_") ? ref : "";
+  if (ref.startsWith("pay_")) return ref;
+  const provider = String(invoice?.provider ?? "").toLowerCase();
+  if (provider === "dev" || provider === "coupon" || ref === "dev-free") return "dev-free";
+  return "";
 }
 
 export async function POST(_req: Request, { params }: Ctx) {
@@ -45,14 +49,14 @@ export async function POST(_req: Request, { params }: Ctx) {
 
     const { data: invoice, error: invoiceError } = await db
       .from("invoices")
-      .select("provider_ref, metadata")
+      .select("provider, provider_ref, metadata")
       .eq("order_id", row.order_id)
       .maybeSingle();
     if (invoiceError) return serverError(invoiceError);
 
     const paymentId = razorpayPaymentId(invoice as InvoicePay | null);
     if (!paymentId) {
-      return badRequest("No Razorpay payment is stored on this invoice, so the customer cannot be refunded from here.");
+      return badRequest("No payment is stored on this invoice, so the customer cannot be refunded from here.");
     }
 
     const paise = Math.round(Number(row.refund_amount) * 100);

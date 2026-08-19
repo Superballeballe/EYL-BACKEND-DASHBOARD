@@ -45,5 +45,6 @@ export async function invokeRazorpayRefund({
   return {
     refundId: String(payload.refund_id || paymentId),
     alreadyRefunded: Boolean(payload.already_refunded),
+    dev: Boolean((payload as { dev?: boolean }).dev),
   };
 }
