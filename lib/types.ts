@@ -232,3 +232,25 @@ export type DraftOrder = {
   expires_at: string | null;
   draft_reverted_at: string | null;
 };
+
+/** Customer-cancelled app order — hidden in the app, shown on this dashboard. */
+export type CancelledOrder = {
+  id: string;
+  order_id: string | null;
+  order_code: string | null;
+  user_id: string | null;
+  reason_code: string;
+  reason_label: string;
+  reason_note: string | null;
+  was_confirmed: boolean;
+  payment_status: string | null;
+  total_amount: number | null;
+  cancellation_fee: number;
+  refund_amount: number;
+  refund_status: "none" | "pending" | "refunded";
+  pickup_address: string | null;
+  delivery_address: string | null;
+  cancelled_at: string;
+  refund_ref?: string | null;
+  refunded_at?: string | null;
+};

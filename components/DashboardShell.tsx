@@ -20,19 +20,21 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
 import DraftsIcon from "@mui/icons-material/Drafts";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
+import RefundCustomerButton from "@/components/RefundCustomerButton";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
 import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format";
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
 import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
 import { formatDeliveryOrderId } from "@/lib/serial";
 import { gray, tableShellSx } from "@/lib/surface";
-import type { Delivery, DraftOrder, WorkDay } from "@/lib/types";
+import type { CancelledOrder, Delivery, DraftOrder, WorkDay } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
 type ClientOpt = {
@@ -64,6 +66,7 @@ type Props = {
   pendingOrders: Delivery[];
   draftOrders: DraftOrder[];
   runningOrders: Delivery[];
+  refundPendingOrders: CancelledOrder[];
   knights: KnightOpt[];
   clients: ClientOpt[];
   rateTiers: RateTierOpt[];
@@ -362,6 +365,78 @@ function DraftOrdersTable({ rows, emptyMessage }: { rows: DraftOrder[]; emptyMes
   );
 }
 
+function RefundPendingTable({ rows, emptyMessage }: { rows: CancelledOrder[]; emptyMessage: string }) {
+  if (rows.length === 0) {
+    return (
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 200,
+          borderRadius: 1,
+          border: `1px dashed ${gray.border}`,
+          bgcolor: gray.surface,
+        }}
+      >
+        <EmptyState message={emptyMessage} compact />
+      </Box>
+    );
+  }
+
+  return (
+    <TableContainer sx={{ ...tableShellSx, overflowX: "auto" }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Order · route</TableCell>
+            <TableCell>Reason</TableCell>
+            <TableCell sx={{ width: "7rem" }} align="right">
+              Fee kept
+            </TableCell>
+            <TableCell sx={{ width: "7rem" }} align="right">
+              Refund
+            </TableCell>
+            <TableCell sx={{ width: "9rem" }} />
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {row.order_code || "—"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                    {[row.pickup_address, row.delivery_address].filter(Boolean).join(" → ") || "—"}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{row.reason_label}</Typography>
+                  {row.reason_note ? (
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                      {row.reason_note}
+                    </Typography>
+                  ) : null}
+                </TableCell>
+                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {money(row.cancellation_fee)}
+                </TableCell>
+                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                  {money(row.refund_amount)}
+                </TableCell>
+                <TableCell>
+                  <RefundCustomerButton id={row.id} amount={row.refund_amount} />
+                </TableCell>
+              </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
 function DraftOrdersPanel({ rows }: { rows: DraftOrder[] }) {
   return (
     <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -406,6 +481,7 @@ export default function DashboardShell(props: Props) {
     pendingOrders,
     draftOrders,
     runningOrders,
+    refundPendingOrders,
     knights,
     clients,
     rateTiers,
@@ -416,6 +492,7 @@ export default function DashboardShell(props: Props) {
   const pendingCount = pendingOrders.length;
   const draftCount = draftOrders.length;
   const runningCount = runningOrders.length;
+  const refundCount = refundPendingOrders.length;
   const bothEmpty = pendingCount === 0 && runningCount === 0;
 
   useEffect(() => {
@@ -439,6 +516,8 @@ export default function DashboardShell(props: Props) {
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        allowScrollButtonsMobile
         sx={{ mb: 3, borderBottom: 1, borderColor: "divider", minHeight: 44 }}
       >
         <Tab
@@ -450,6 +529,16 @@ export default function DashboardShell(props: Props) {
               {pendingCount + runningCount > 0 ? (
                 <Chip size="small" color="primary" label={pendingCount + runningCount} />
               ) : null}
+            </Stack>
+          }
+        />
+        <Tab
+          icon={<PaymentsOutlinedIcon fontSize="small" />}
+          iconPosition="start"
+          label={
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <span>Refund pending</span>
+              {refundCount > 0 ? <Chip size="small" color="warning" label={refundCount} /> : null}
             </Stack>
           }
         />
@@ -527,6 +616,26 @@ export default function DashboardShell(props: Props) {
       )}
 
       {tab === 1 && (
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
+              <Box>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <PaymentsOutlinedIcon color="primary" fontSize="small" />
+                  <Typography variant="h2">Refund pending</Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
+                  Paid cancellations: keep 10%, refund 90% to the customer via Razorpay.
+                </Typography>
+              </Box>
+              <Chip variant="outlined" color="warning" label={`${refundCount} pending`} />
+            </Stack>
+            <RefundPendingTable rows={refundPendingOrders} emptyMessage="No refunds waiting." />
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 2 && (
         <Box
           sx={{
             display: "grid",
@@ -539,7 +648,7 @@ export default function DashboardShell(props: Props) {
         </Box>
       )}
 
-      {tab === 2 && (
+      {tab === 3 && (
         <BusinessOverview
           viewDate={viewDate}
           periodStart={periodStart}

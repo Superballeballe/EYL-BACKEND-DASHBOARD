@@ -24,6 +24,7 @@ A hardened Docker Compose setup for self-hosting the Next.js dashboard.
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps JS key (**build arg**; enable Maps JS / Places / Directions / Geocoding; allow your prod domain in key referrers) |
 | `SESSION_SECRET` | Random 32+ byte string (`openssl rand -hex 32`) |
 | `API_KEY` | Secret for `x-api-key` write endpoints |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Same Razorpay keys as the app — used to refund customers from Cancelled orders |
 | `DASHBOARD_DOMAIN` | (proxy only) real hostname for Let's Encrypt TLS |
 
 > The DB schema must already be applied (`supabase/migrations/0001_init.sql`).

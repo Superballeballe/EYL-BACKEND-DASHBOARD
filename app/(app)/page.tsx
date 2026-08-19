@@ -9,7 +9,7 @@ import { getSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fmtDate, todayISO } from "@/lib/format";
 import type { ChartBundle, MonthPoint } from "@/components/BusinessOverview";
-import type { Delivery, DraftOrder, WorkDay } from "@/lib/types";
+import type { CancelledOrder, Delivery, DraftOrder, WorkDay } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ function buildCharts(rows: PeriodRow[], today: string): ChartBundle {
 async function getData(today: string) {
   const yearStart = `${today.slice(0, 4)}-01-01`;
   const db = supabaseAdmin();
-  const [del, wd, unpaid, review, periodRows, pending, running, draft, formOpts] =
+  const [del, wd, unpaid, review, periodRows, pending, running, draft, formOpts, refundPending] =
     await Promise.all([
       db
         .from("deliveries")
@@ -139,6 +139,12 @@ async function getData(today: string) {
         .order("draft_reverted_at", { ascending: false })
         .limit(80),
       getDeliveryFormOptions(),
+      db
+        .from("cancelled_orders")
+        .select("*")
+        .eq("refund_status", "pending")
+        .order("cancelled_at", { ascending: false })
+        .limit(80),
     ]);
 
   const charts = buildCharts(periodRows, today);
@@ -158,6 +164,7 @@ async function getData(today: string) {
 
   const activePending = pendingOrders.filter((d) => !isAppOrderCancelled(d.app_order));
   const draftOrders = (draft.data ?? []) as DraftOrder[];
+  const refundPendingOrders = (refundPending.data ?? []) as CancelledOrder[];
 
   return {
     deliveries: (del.data ?? []) as Delivery[],
@@ -167,6 +174,7 @@ async function getData(today: string) {
     pendingOrders: activePending,
     draftOrders,
     runningOrders,
+    refundPendingOrders,
     knights: formOpts.knights as { id: string; display_name: string }[],
     clients: formOpts.clients,
     rateTiers: formOpts.rateTiers,
@@ -212,6 +220,7 @@ export default async function Dashboard() {
     pendingOrders,
     draftOrders,
     runningOrders,
+    refundPendingOrders,
     knights,
     clients,
     rateTiers,
@@ -249,6 +258,7 @@ export default async function Dashboard() {
         pendingOrders={pendingOrders}
         draftOrders={draftOrders}
         runningOrders={runningOrders}
+        refundPendingOrders={refundPendingOrders}
         knights={knights}
         clients={clients}
         rateTiers={rateTiers}

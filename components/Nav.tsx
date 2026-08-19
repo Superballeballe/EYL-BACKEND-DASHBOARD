@@ -20,6 +20,7 @@ import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumb
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
@@ -36,6 +37,7 @@ const COLLAPSED_W = 72;
 const LINKS = [
   { href: "/", label: "Dashboard", Icon: DashboardOutlinedIcon },
   { href: "/deliveries", label: "Deliveries", Icon: LocalShippingOutlinedIcon },
+  { href: "/cancelled-orders", label: "Cancelled orders", Icon: CancelOutlinedIcon },
   { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
   { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
   { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
