@@ -1,5 +1,5 @@
 import { badRequest, notFound, ok, serverError, unauthorized } from "@/lib/api";
-import { invokeRazorpayRefund } from "@/lib/server/razorpayRefund";
+import { invokeRazorpayRefund, mockRefundId } from "@/lib/server/razorpayRefund";
 import { requireSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -61,20 +61,24 @@ export async function POST(_req: Request, { params }: Ctx) {
 
     const paise = Math.round(Number(row.refund_amount) * 100);
     let refundId: string;
-    try {
-      const refund = await invokeRazorpayRefund({
-        paymentId,
-        amountPaise: paise,
-        idempotencyKey: id,
-        notes: {
-          cancelled_order_id: id,
-          order_code: row.order_code || "",
-          reason: row.reason_code || "",
-        },
-      });
-      refundId = refund.refundId;
-    } catch (error) {
-      return badRequest(error instanceof Error ? error.message : "Razorpay refund failed");
+    if (paymentId === "dev-free" || !paymentId.startsWith("pay_")) {
+      refundId = mockRefundId(id);
+    } else {
+      try {
+        const refund = await invokeRazorpayRefund({
+          paymentId,
+          amountPaise: paise,
+          idempotencyKey: id,
+          notes: {
+            cancelled_order_id: id,
+            order_code: row.order_code || "",
+            reason: row.reason_code || "",
+          },
+        });
+        refundId = refund.refundId;
+      } catch (error) {
+        return badRequest(error instanceof Error ? error.message : "Razorpay refund failed");
+      }
     }
 
     const stamp = new Date().toISOString();
