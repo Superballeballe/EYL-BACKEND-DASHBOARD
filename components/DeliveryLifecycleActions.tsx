@@ -280,6 +280,11 @@ export default function DeliveryLifecycleActions({
     setAssignOpen(true);
   }
 
+  function handleCancel() {
+    if (!window.confirm("Cancel this order? The customer will no longer see it in the app.")) return;
+    run({ action: "cancel" });
+  }
+
   function submitAssignment() {
     const currentMinute = nowDatetimeLocalInput();
     setMinPickupAt(currentMinute);
@@ -331,15 +336,27 @@ export default function DeliveryLifecycleActions({
         }}
       >
         {variant === "pending" ? (
-          <Button
-            size="small"
-            variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
-            disabled={busyAction !== null || isCancelled || awaitingPayment}
-            onClick={openAssignment}
-            sx={compactBtnSx}
-          >
-            {busyAction === "confirm" ? "…" : assignLabel}
-          </Button>
+          <>
+            <Button
+              size="small"
+              variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
+              disabled={busyAction !== null || isCancelled || awaitingPayment}
+              onClick={openAssignment}
+              sx={compactBtnSx}
+            >
+              {busyAction === "confirm" ? "…" : assignLabel}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              disabled={busyAction !== null || isCancelled}
+              onClick={handleCancel}
+              sx={compactBtnSx}
+            >
+              {busyAction === "cancel" ? "…" : "Cancel"}
+            </Button>
+          </>
         ) : null}
 
         {variant === "running" ? (
