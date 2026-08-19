@@ -160,7 +160,6 @@ function legacyOrderStatus(status: unknown) {
 
 function assignmentOrderStatus(fulfillmentStatus: string | null | undefined) {
   if (fulfillmentStatus === "completed") return "delivered";
-  if (fulfillmentStatus === "active") return "picked_up";
   if (fulfillmentStatus === "cancelled") return "cancelled";
   return "rider_assigned";
 }
