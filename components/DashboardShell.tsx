@@ -23,10 +23,13 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
+import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
-import { fmtDatetimeLocal, money, routeAreaLabel } from "@/lib/format";
+import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format";
+import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
+import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
 import { formatDeliveryOrderId } from "@/lib/serial";
 import { gray, tableShellSx } from "@/lib/surface";
 import type { Delivery, DraftOrder, WorkDay } from "@/lib/types";
@@ -126,7 +129,10 @@ function OrdersTable({
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((d) => (
+          {rows.map((d) => {
+            const stops = getDeliveryStops(d);
+            const stopSummary = formatStopRouteSummary(stops);
+            return (
             <TableRow
               key={d.id}
               hover
@@ -152,12 +158,24 @@ function OrdersTable({
                       {d.sender_name ?? "—"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.35 }}>
-                      {routeAreaLabel(d.pickup_location, d.drop_location)}
+                      {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
                     </Typography>
+                    {stopSummary ? (
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+                        Pickup · {areaLabel(d.pickup_location)}
+                      </Typography>
+                    ) : null}
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.35 }}>
                       {formatDeliveryOrderId(d)}
-                      {d.drop_recipient_name ? ` · ${d.drop_recipient_name}` : ""}
+                      {stops.length > 1
+                        ? stops.map((stop) => stop.contactName).filter(Boolean).length
+                          ? ` · ${stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")}`
+                          : ""
+                        : d.drop_recipient_name
+                          ? ` · ${d.drop_recipient_name}`
+                          : ""}
                     </Typography>
+                    <DeliveryTaskBadges delivery={d} />
                   </>
                 ) : (
                   <>
@@ -165,12 +183,24 @@ function OrdersTable({
                       {d.sender_name ?? "—"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.25 }}>
-                      {routeAreaLabel(d.pickup_location, d.drop_location)}
+                      {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
                     </Typography>
+                    {stopSummary ? (
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+                        Pickup · {areaLabel(d.pickup_location)}
+                      </Typography>
+                    ) : null}
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
                       {formatDeliveryOrderId(d)}
-                      {d.drop_recipient_name ? ` · ${d.drop_recipient_name}` : ""}
+                      {stops.length > 1
+                        ? stops.map((stop) => stop.contactName).filter(Boolean).length
+                          ? ` · ${stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")}`
+                          : ""
+                        : d.drop_recipient_name
+                          ? ` · ${d.drop_recipient_name}`
+                          : ""}
                     </Typography>
+                    <DeliveryTaskBadges delivery={d} />
                     {d.pickup_time_window ? (
                       <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
                         Pickup {fmtDatetimeLocal(d.pickup_time_window)}
@@ -200,7 +230,8 @@ function OrdersTable({
                 />
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>

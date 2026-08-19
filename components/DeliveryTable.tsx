@@ -22,7 +22,10 @@ import {
 import { Check, Copy, Share2, X } from "lucide-react";
 import DeliveryForm from "@/components/DeliveryForm";
 import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/DeliveryLifecycleActions";
+import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
+import { getDeliveryInstructions, getDeliveryStops } from "@/lib/deliveryRouteDetails";
+import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money, routeAreaLabel } from "@/lib/format";
 import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
 import { effectiveFulfillmentStatus } from "@/lib/deliveryStatus";
@@ -130,6 +133,7 @@ export default function DeliveryTable({
                     {delivery.assignment_status === "cancelled" ? (
                       <Chip size="small" color="error" variant="outlined" label="Cancelled" />
                     ) : null}
+                    <DeliveryTaskBadges delivery={delivery} inline />
                   </Stack>
                 </TableCell>
                 <TableCell>
@@ -306,6 +310,7 @@ export function DeliveryPreviewModal({
                 {delivery.needs_review ? (
                   <Chip size="small" color="warning" variant="outlined" label="Review" />
                 ) : null}
+                <DeliveryTaskBadges delivery={delivery} inline />
               </Stack>
               <h2 id="delivery-preview-title" className="mt-2 truncate text-xl font-bold">
                 {delivery.sender_name ?? "Delivery"}
@@ -421,12 +426,18 @@ function DeliveryPreview({
 }) {
   const { orderId, source } = orderMeta(delivery);
   const actionVariant = previewLifecycleVariant(delivery.fulfillment_status);
+  const stops = getDeliveryStops(delivery);
+  const stopSummary = formatStopRouteSummary(stops);
+  const instructions = getDeliveryInstructions(delivery);
+  const hasInstructions = Boolean(
+    instructions.pickup || instructions.delivery || instructions.multiDrop,
+  );
 
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)]">
       <section aria-label="Route">
         <div className="mb-4 rounded-lg bg-[#f8fafc] px-4 py-3 text-sm font-semibold text-[var(--text)]">
-          {routeAreaLabel(delivery.pickup_location, delivery.drop_location)}
+          {stopSummary ?? routeAreaLabel(delivery.pickup_location, delivery.drop_location)}
         </div>
         <div className="space-y-3">
           <RouteDetail
@@ -434,15 +445,36 @@ function DeliveryPreview({
             location={delivery.pickup_location}
             timeWindow={delivery.pickup_time_window}
             actualTime={delivery.pickup_actual_time}
+            instructions={instructions.pickup}
           />
-          <RouteDetail
-            title="Drop"
-            location={delivery.drop_location}
-            timeWindow={delivery.drop_time_window}
-            actualTime={delivery.drop_actual_time}
-            person={delivery.drop_recipient_name}
-          />
+          {stops.map((stop) => (
+            <RouteDetail
+              key={`${stop.label}-${stop.location ?? stop.contactName ?? "drop"}`}
+              title={stop.label}
+              location={stop.location}
+              timeWindow={stop.label === "Drop" ? delivery.drop_time_window : null}
+              actualTime={stop.label === "Drop" ? delivery.drop_actual_time : null}
+              person={stop.contactName}
+              phone={stop.contactPhone}
+              instructions={stop.instructions ?? (stop.label === "Drop" || stop.label === "Drop 1" ? instructions.delivery : null)}
+              isReturn={stop.isReturn}
+            />
+          ))}
         </div>
+
+        {hasInstructions ? (
+          <div className="mt-5 space-y-3">
+            {instructions.multiDrop ? (
+              <InfoTile label="Multidrop instructions" value={instructions.multiDrop} />
+            ) : null}
+            {instructions.pickup ? (
+              <InfoTile label="Pickup instructions" value={instructions.pickup} />
+            ) : null}
+            {instructions.delivery && stops.length <= 1 ? (
+              <InfoTile label="Delivery instructions" value={instructions.delivery} />
+            ) : null}
+          </div>
+        ) : null}
 
         {(delivery.content || delivery.remark) && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -523,12 +555,18 @@ function RouteDetail({
   timeWindow,
   actualTime,
   person,
+  phone,
+  instructions,
+  isReturn,
 }: {
   title: string;
   location: string | null;
   timeWindow: string | null;
   actualTime: string | null;
   person?: string | null;
+  phone?: string | null;
+  instructions?: string | null;
+  isReturn?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-[var(--border)] p-4">
@@ -543,10 +581,18 @@ function RouteDetail({
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--muted-foreground)]">
+        {isReturn ? <span className="badge badge-gray">Return leg</span> : null}
         {person ? <span className="badge badge-gray">To {person}</span> : null}
+        {phone ? <span className="badge badge-gray">{phone}</span> : null}
         {timeWindow ? <span className="badge badge-blue">Scheduled {fmtDatetimeLocal(timeWindow)}</span> : null}
         {actualTime ? <span className="badge badge-green">Actual {fmtDatetimeLocal(actualTime)}</span> : null}
       </div>
+      {instructions ? (
+        <div className="mt-3 rounded-md bg-[#f8fafc] px-3 py-2 text-xs leading-relaxed text-[var(--text)]">
+          <span className="font-semibold">Instructions: </span>
+          {instructions}
+        </div>
+      ) : null}
     </div>
   );
 }

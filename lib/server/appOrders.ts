@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Delivery } from "@/lib/types";
 
 const APP_ORDER_SELECTS = [
-  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, invoices(payment_status)",
+  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, metadata)",
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at",
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
   "id, order_code, status, scheduled_for, pickup_scheduled_at, delivery_scheduled_at",
@@ -19,13 +19,56 @@ export async function loadAppOrdersByIds(
   for (const columns of APP_ORDER_SELECTS) {
     const { data, error } = await db.from("orders").select(columns).in("id", appOrderIds);
     if (!error) {
-      return {
-        orders: (data ?? []) as unknown as NonNullable<Delivery["app_order"]>[],
-        error: null,
-      };
+      const orders = await enrichAppOrdersWithRouteMeta(
+        db,
+        (data ?? []) as unknown as NonNullable<Delivery["app_order"]>[],
+      );
+      return { orders, error: null };
     }
   }
   return { orders: [], error: "App order status could not be loaded." };
+}
+
+async function enrichAppOrdersWithRouteMeta(
+  db: ReturnType<typeof supabaseAdmin>,
+  orders: NonNullable<Delivery["app_order"]>[],
+): Promise<NonNullable<Delivery["app_order"]>[]> {
+  if (orders.length === 0) return orders;
+  const ids = orders.map((order) => order.id);
+
+  const [{ data: invoices }, { data: orderRows }] = await Promise.all([
+    db.from("invoices").select("order_id, payment_status, metadata").in("order_id", ids),
+    db.from("orders").select("id, pickup_instructions, delivery_instructions").in("id", ids),
+  ]);
+
+  const invoiceByOrder = new Map<string, { payment_status?: string | null; metadata?: Record<string, unknown> | null }>();
+  for (const invoice of invoices ?? []) {
+    if (!invoiceByOrder.has(invoice.order_id)) {
+      invoiceByOrder.set(invoice.order_id, invoice);
+    }
+  }
+
+  const instructionsByOrder = new Map(
+    (orderRows ?? []).map((row) => [row.id as string, row as { pickup_instructions?: string | null; delivery_instructions?: string | null }]),
+  );
+
+  return orders.map((order) => {
+    const invoice = invoiceByOrder.get(order.id);
+    const instructions = instructionsByOrder.get(order.id);
+    const existing = Array.isArray(order.invoices) ? order.invoices[0] : order.invoices;
+
+    return {
+      ...order,
+      pickup_instructions: instructions?.pickup_instructions ?? order.pickup_instructions ?? null,
+      delivery_instructions: instructions?.delivery_instructions ?? order.delivery_instructions ?? null,
+      invoices: invoice
+        ? {
+            payment_status: invoice.payment_status ?? existing?.payment_status ?? null,
+            metadata: invoice.metadata ?? existing?.metadata ?? null,
+          }
+        : order.invoices ?? existing ?? null,
+    };
+  });
 }
 
 export async function attachAppOrders<
