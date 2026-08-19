@@ -28,6 +28,16 @@ export async function GET(req: Request) {
           { event: "*", schema: "public", table: "deliveries" },
           () => send("change"),
         )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "orders" },
+          () => send("change"),
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "invoices" },
+          () => send("change"),
+        )
         .subscribe();
 
       send("ready");
