@@ -1,4 +1,5 @@
 import { badRequest, notFound, ok, serverError, unauthorized } from "@/lib/api";
+import { invokeRazorpayRefund } from "@/lib/server/razorpayRefund";
 import { requireSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -18,22 +19,12 @@ function razorpayPaymentId(invoice: InvoicePay | null) {
   return ref.startsWith("pay_") ? ref : "";
 }
 
-function alreadyRefunded(message: string) {
-  return /already refunded|fully refunded|refund has already been processed/i.test(message);
-}
-
 export async function POST(_req: Request, { params }: Ctx) {
   try {
     await requireSessionUser();
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") return unauthorized("Sign in required");
     return serverError(e);
-  }
-
-  const keyId = process.env.RAZORPAY_KEY_ID?.trim();
-  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
-  if (!keyId || !keySecret) {
-    return badRequest("Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to the dashboard env.");
   }
 
   try {
@@ -65,33 +56,23 @@ export async function POST(_req: Request, { params }: Ctx) {
     }
 
     const paise = Math.round(Number(row.refund_amount) * 100);
-    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const rzp = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-        "X-Razorpay-Idempotency-Key": id,
-      },
-      body: JSON.stringify({
-        amount: paise,
+    let refundId: string;
+    try {
+      const refund = await invokeRazorpayRefund({
+        paymentId,
+        amountPaise: paise,
+        idempotencyKey: id,
         notes: {
           cancelled_order_id: id,
           order_code: row.order_code || "",
           reason: row.reason_code || "",
         },
-      }),
-    });
-    const payload = (await rzp.json()) as {
-      id?: string;
-      error?: { description?: string };
-    };
-    const rzpError = String(payload?.error?.description || "");
-    if (!rzp.ok && !alreadyRefunded(rzpError)) {
-      return badRequest(rzpError || "Razorpay refund failed");
+      });
+      refundId = refund.refundId;
+    } catch (error) {
+      return badRequest(error instanceof Error ? error.message : "Razorpay refund failed");
     }
 
-    const refundId = payload.id || row.refund_ref || paymentId;
     const stamp = new Date().toISOString();
     const { error: updateError } = await db
       .from("cancelled_orders")
