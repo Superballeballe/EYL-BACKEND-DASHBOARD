@@ -21,7 +21,7 @@ import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
 import DraftsIcon from "@mui/icons-material/Drafts";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
@@ -387,27 +387,19 @@ export default function DashboardShell(props: Props) {
   const runningCount = runningOrders.length;
   const bothEmpty = pendingCount === 0 && runningCount === 0;
 
-  const lastSignal = useRef<string | null>(null);
   useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      try {
-        const res = await fetch("/api/deliveries/signal", { cache: "no-store" });
-        if (!res.ok || cancelled) return;
-        const { signal } = (await res.json()) as { signal: string };
-        if (lastSignal.current !== null && signal !== lastSignal.current) {
-          router.refresh();
-        }
-        lastSignal.current = signal;
-      } catch {
-        // ignore — next tick retries
-      }
-    }
-    poll();
-    const id = setInterval(poll, 2500);
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const es = new EventSource("/api/deliveries/stream");
+
+    const onChange = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => router.refresh(), 300);
+    };
+
+    es.addEventListener("change", onChange);
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      if (debounce) clearTimeout(debounce);
+      es.close();
     };
   }, [router]);
 
