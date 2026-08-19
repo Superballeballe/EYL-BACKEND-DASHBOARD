@@ -14,14 +14,10 @@ type SendOrderAssignedOptions = {
   knightName: string;
   pickupScheduledAt?: string | null;
   deliveryScheduledAt?: string | null;
-  /** When false, only send knight-assigned alert (payment already handled). */
-  paymentDue?: boolean;
 };
 
-type SendPaymentWindowOptions = {
+type OrderPushOptions = {
   orderId: string;
-  knightName?: string | null;
-  deliveryScheduledAt?: string | null;
 };
 
 type PushPayload = {
@@ -57,10 +53,7 @@ function isMissingPushTokenTable(error: { code?: string; message?: string }) {
   );
 }
 
-export async function sendPaymentWindowNotification(
-  db: SupabaseClient,
-  { orderId, knightName, deliveryScheduledAt }: SendPaymentWindowOptions,
-) {
+async function loadOrderPushTokens(db: SupabaseClient, orderId: string) {
   const { data: order, error: orderError } = await db
     .from("orders")
     .select("user_id, order_code")
@@ -70,7 +63,7 @@ export async function sendPaymentWindowNotification(
   if (orderError) throw new Error(orderError.message);
 
   const target = order as OrderPushTarget | null;
-  if (!target?.user_id) return { sent: 0 };
+  if (!target?.user_id) return { target: null, pushTokens: [] as string[] };
 
   const { data: tokens, error: tokenError } = await db
     .from("app_push_tokens")
@@ -79,7 +72,7 @@ export async function sendPaymentWindowNotification(
     .eq("enabled", true);
 
   if (tokenError) {
-    if (isMissingPushTokenTable(tokenError)) return { sent: 0 };
+    if (isMissingPushTokenTable(tokenError)) return { target, pushTokens: [] };
     throw new Error(tokenError.message);
   }
 
@@ -87,35 +80,14 @@ export async function sendPaymentWindowNotification(
     .map((row) => row.token)
     .filter((token): token is string => Boolean(token && isExpoPushToken(token)));
 
-  if (pushTokens.length === 0) return { sent: 0 };
+  return { target, pushTokens };
+}
 
-  const suffix = target.order_code ? ` · ${target.order_code}` : "";
-  const drop = formatPushTime(deliveryScheduledAt);
-  const dropNote = drop ? ` Drop by ${drop}.` : "";
-  const payloads: PushPayload[] = [];
+async function sendOrderPush(db: SupabaseClient, orderId: string, payloads: PushPayload[]) {
+  if (payloads.length === 0) return { sent: 0 };
 
-  if (knightName?.trim()) {
-    payloads.push({
-      title: "Delivery knight assigned",
-      body: `${knightName.trim()} has been assigned to your delivery.${dropNote}${suffix}`,
-      data: {
-        type: "order_assigned",
-        orderId,
-        orderCode: target.order_code,
-        dropTime: drop,
-      },
-    });
-  }
-
-  payloads.push({
-    title: "Confirm order and pay",
-    body: `Complete payment within 3 minutes to keep your delivery.${suffix}`,
-    data: {
-      type: "payment_due",
-      orderId,
-      orderCode: target.order_code,
-    },
-  });
+  const { target, pushTokens } = await loadOrderPushTokens(db, orderId);
+  if (!target?.user_id || pushTokens.length === 0) return { sent: 0 };
 
   const messages = pushTokens.flatMap((to) =>
     payloads.map((payload) => ({
@@ -142,50 +114,50 @@ export async function sendPaymentWindowNotification(
   return { sent: messages.length };
 }
 
+function orderSuffix(orderCode: string | null | undefined) {
+  return orderCode ? ` · ${orderCode}` : "";
+}
+
+/** Dashboard confirm — customer should pay within the in-app payment window. */
+export async function sendOrderConfirmedNotification(db: SupabaseClient, { orderId }: OrderPushOptions) {
+  const { target } = await loadOrderPushTokens(db, orderId);
+  const suffix = orderSuffix(target?.order_code);
+
+  return sendOrderPush(db, orderId, [
+    {
+      title: "Order confirmed",
+      body: `Your order has been confirmed.${suffix}`,
+      data: {
+        type: "order_confirmed",
+        orderId,
+        orderCode: target?.order_code ?? null,
+      },
+    },
+  ]);
+}
+
+/** @deprecated Use sendOrderConfirmedNotification — kept for callers during transition. */
+export async function sendPaymentWindowNotification(db: SupabaseClient, { orderId }: OrderPushOptions) {
+  return sendOrderConfirmedNotification(db, { orderId });
+}
+
 export async function sendOrderAssignedNotification(
   db: SupabaseClient,
-  { orderId, knightName, pickupScheduledAt, deliveryScheduledAt, paymentDue = true }: SendOrderAssignedOptions,
+  { orderId, knightName, pickupScheduledAt, deliveryScheduledAt }: SendOrderAssignedOptions,
 ) {
-  const { data: order, error: orderError } = await db
-    .from("orders")
-    .select("user_id, order_code")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (orderError) throw new Error(orderError.message);
-
-  const target = order as OrderPushTarget | null;
-  if (!target?.user_id) return { sent: 0 };
-
-  const { data: tokens, error: tokenError } = await db
-    .from("app_push_tokens")
-    .select("token")
-    .eq("user_id", target.user_id)
-    .eq("enabled", true);
-
-  if (tokenError) {
-    if (isMissingPushTokenTable(tokenError)) return { sent: 0 };
-    throw new Error(tokenError.message);
-  }
-
-  const pushTokens = ((tokens ?? []) as PushTokenRow[])
-    .map((row) => row.token)
-    .filter((token): token is string => Boolean(token && isExpoPushToken(token)));
-
-  if (pushTokens.length === 0) return { sent: 0 };
-
-  const suffix = target.order_code ? ` · ${target.order_code}` : '';
+  const { target } = await loadOrderPushTokens(db, orderId);
+  const suffix = orderSuffix(target?.order_code);
   const drop = formatPushTime(deliveryScheduledAt);
   const dropNote = drop ? ` Drop by ${drop}.` : "";
 
-  const payloads: PushPayload[] = [
+  return sendOrderPush(db, orderId, [
     {
       title: "Delivery knight assigned",
       body: `${knightName} has been assigned to your delivery.${dropNote}${suffix}`,
       data: {
         type: "order_assigned",
         orderId,
-        orderCode: target.order_code,
+        orderCode: target?.order_code ?? null,
         pickupScheduledAt: pickupScheduledAt ?? null,
         deliveryScheduledAt: deliveryScheduledAt ?? null,
         dropScheduledAt: deliveryScheduledAt ?? null,
@@ -193,41 +165,39 @@ export async function sendOrderAssignedNotification(
         dropTime: drop,
       },
     },
-  ];
+  ]);
+}
 
-  if (paymentDue) {
-    payloads.push({
-      title: "Confirm order and pay",
-      body: `Complete payment within 3 minutes to keep your delivery.${suffix}`,
+export async function sendPickupNotification(db: SupabaseClient, { orderId }: OrderPushOptions) {
+  const { target } = await loadOrderPushTokens(db, orderId);
+  const suffix = orderSuffix(target?.order_code);
+
+  return sendOrderPush(db, orderId, [
+    {
+      title: "Picked up",
+      body: `Your parcel has been picked up.${suffix}`,
       data: {
-        type: "payment_due",
+        type: "order_picked_up",
         orderId,
-        orderCode: target.order_code,
+        orderCode: target?.order_code ?? null,
       },
-    });
-  }
-
-  const messages = pushTokens.flatMap((to) =>
-    payloads.map((payload) => ({
-      to,
-      sound: "default" as const,
-      ...payload,
-    })),
-  );
-
-  const response = await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip, deflate",
-      "Content-Type": "application/json"
     },
-    body: JSON.stringify(messages)
-  });
+  ]);
+}
 
-  if (!response.ok) {
-    throw new Error(`Expo push request failed with ${response.status}`);
-  }
+export async function sendDeliveredNotification(db: SupabaseClient, { orderId }: OrderPushOptions) {
+  const { target } = await loadOrderPushTokens(db, orderId);
+  const suffix = orderSuffix(target?.order_code);
 
-  return { sent: messages.length };
+  return sendOrderPush(db, orderId, [
+    {
+      title: "Delivered",
+      body: `Your order has been delivered.${suffix}`,
+      data: {
+        type: "order_delivered",
+        orderId,
+        orderCode: target?.order_code ?? null,
+      },
+    },
+  ]);
 }

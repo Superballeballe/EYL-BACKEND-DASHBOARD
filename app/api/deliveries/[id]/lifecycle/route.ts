@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
 import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
-import { sendOrderAssignedNotification, sendPaymentWindowNotification } from "@/lib/server/expoPush";
+import {
+  sendDeliveredNotification,
+  sendOrderAssignedNotification,
+  sendOrderConfirmedNotification,
+  sendPickupNotification,
+} from "@/lib/server/expoPush";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -347,11 +352,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
       if (action.action === "confirm") {
         try {
-          await sendPaymentWindowNotification(db, {
-            orderId: linkedDelivery.app_order_id,
-          });
+          await sendOrderConfirmedNotification(db, { orderId: linkedDelivery.app_order_id });
         } catch (error) {
-          console.warn("[notifications] failed to send payment window push:", error);
+          console.warn("[notifications] failed to send order confirmed push:", error);
         }
       } else if (action.action === "assign") {
         try {
@@ -360,10 +363,21 @@ export async function PATCH(req: Request, { params }: Ctx) {
             knightName: orderPatch.rider_name as string,
             pickupScheduledAt: orderPatch.pickup_scheduled_at as string | null | undefined,
             deliveryScheduledAt: orderPatch.delivery_scheduled_at as string | null | undefined,
-            paymentDue: false,
           });
         } catch (error) {
           console.warn("[notifications] failed to send assignment push:", error);
+        }
+      } else if (action.action === "pickup") {
+        try {
+          await sendPickupNotification(db, { orderId: linkedDelivery.app_order_id });
+        } catch (error) {
+          console.warn("[notifications] failed to send pickup push:", error);
+        }
+      } else if (action.action === "deliver") {
+        try {
+          await sendDeliveredNotification(db, { orderId: linkedDelivery.app_order_id });
+        } catch (error) {
+          console.warn("[notifications] failed to send delivered push:", error);
         }
       }
     }
