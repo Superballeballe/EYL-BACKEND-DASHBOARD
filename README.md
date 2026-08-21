@@ -26,9 +26,10 @@ Edit `.env.local` (already created; **fill in the service-role key**):
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL (Settings → API) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Secret** service-role key — server only, never shipped to the browser |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public key (optional for now) |
-| `APP_PASSWORD` | Shared password for the web UI (`/login`) |
 | `SESSION_SECRET` | Random string used to sign the login cookie |
-| `API_KEY` | Secret for the `x-api-key` header on write/automation endpoints |
+| `API_KEY` | Secret for the `x-api-key` header on automation endpoints |
+| `RESEND_API_KEY` / `INVITE_FROM_EMAIL` | Dashboard verification and invitation email |
+| `APP_URL` | Public dashboard URL used in email links |
 
 ## 3. Create the database schema
 
@@ -41,7 +42,7 @@ is only via the service-role key the server holds.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000  (sign in with APP_PASSWORD)
+npm run dev        # http://localhost:3000  (use /setup for the first admin)
 ```
 
 Production / self-host:
@@ -81,54 +82,23 @@ Notes:
 
 ---
 
-## API
+## API and workflow documentation
 
-All endpoints return JSON. **Reads** require a valid UI session **or** the API
-key. **Writes** (POST/PATCH/DELETE) require the API key when called from outside
-the app: send header `x-api-key: <API_KEY>`. `/api/health` is public.
+The system spans this dashboard, the consumer EYL app, the EYL Knight app, and
+one shared Supabase project. Start with [`docs/api/README.md`](docs/api/README.md).
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET/POST | `/api/deliveries` | List (filters: `date`, `from`, `to`, `knight_id`, `payment_status`, `client_id`, `needs_review`, `q`, `limit`, `offset`) / create |
-| GET/PATCH/DELETE | `/api/deliveries/{id}` | Single delivery |
-| GET/POST | `/api/lineup?date=YYYY-MM-DD` | Get / replace a day's lineup |
-| GET/POST | `/api/knights` · GET/PATCH/DELETE `/api/knights/{id}` | Knights |
-| GET/POST | `/api/salaries` | Monthly salary (upsert on knight+month) |
-| GET/POST | `/api/clients` · GET/PATCH/DELETE `/api/clients/{id}` | Clients |
-| GET/POST | `/api/rates` · PATCH/DELETE `/api/rates/{id}` | Rate tiers |
-| POST | `/api/import` | Bulk-insert deliveries `{ deliveries: [...] }` (1–1000) |
-| GET | `/api/health` | Health check |
+- [`dashboard-http-api.md`](docs/api/dashboard-http-api.md) — every dashboard HTTP and SSE route
+- [`supabase-api.md`](docs/api/supabase-api.md) — Auth, PostgREST, RPCs, Edge Functions, Storage, and Realtime
+- [`access-control.md`](docs/api/access-control.md) — who can see and change each resource
+- [`order-lifecycle.md`](docs/api/order-lifecycle.md) — booking, payment, assignment, fulfilment, cancellation, and refund flows
+- [`production-drift.md`](docs/api/production-drift.md) — verified differences between source and the live database
+- [`openapi/`](docs/api/openapi/) — machine-readable dashboard and Edge Function contracts
 
-### Examples
-
-```bash
-# Create a delivery from another app:
-curl -X POST http://localhost:3000/api/deliveries \
-  -H "x-api-key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{
-        "task_date": "2026-05-28",
-        "sender_name": "Alison",
-        "pickup_location": "Mahim",
-        "drop_location": "Bandra W",
-        "drop_recipient_name": "Reshma",
-        "knight_name": "Raju",
-        "fees": 100,
-        "payment_status": "unpaid",
-        "mode_of_booking": "online"
-      }'
-
-# List a day's deliveries:
-curl "http://localhost:3000/api/deliveries?date=2026-05-02" -H "x-api-key: $API_KEY"
-
-# Bulk import:
-curl -X POST http://localhost:3000/api/import \
-  -H "x-api-key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{ "deliveries": [ { "task_date":"2026-05-28", "sender_name":"X", "fees":50 } ] }'
-```
-
-`knight_name` accepts a short name (e.g. `Raju`), a combo (`Rohit/Sachin`), an
-external provider (`We fast`, `Uber`, `self`), or `CANCELLED`. The server resolves
-the `knight_id` automatically when the name matches a knight.
+Dashboard APIs accept a signed `eyl_session` cookie or `x-api-key`, except
+public auth and health routes. Admin operations additionally require an admin
+dashboard session. Mobile apps use Supabase Auth and are constrained by RLS and
+guarded RPCs. Never expose the dashboard API key or Supabase service-role key
+to either mobile app.
 
 ---
 
@@ -172,8 +142,9 @@ production-readiness gaps (secrets rotation, real auth, etc.).
 ```
 app/(app)/...        web pages (dashboard, deliveries, lineup, knights, salaries, clients, rates)
 app/api/...          JSON API route handlers
-app/login            shared-password login
+app/login            per-user dashboard login
 components/          forms + UI
+docs/api/            cross-system API, permissions, and workflow reference
 lib/parse/           date/time/knight/header normalizers (shared by API + importer)
 lib/schemas/         Zod validation (shared by forms + API)
 lib/supabase/        service-role client

@@ -1,0 +1,1122 @@
+openapi: 3.1.0
+info:
+  title: EYL Backend Dashboard API
+  version: 1.0.0
+  description: |
+    Machine-readable contract for the current Next.js `app/api` routes.
+    Unless an operation overrides security, either a dashboard session cookie or
+    `x-api-key` is accepted by middleware. Admin descriptions identify the
+    additional cookie-backed admin-role check performed by the route handler.
+servers:
+  - url: https://eyl.adamantium.digital
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+security:
+  - eyl_session: []
+  - api_key: []
+tags:
+  - name: Auth
+  - name: Admin
+  - name: Deliveries
+  - name: Knights
+  - name: Clients
+  - name: Rates
+  - name: Coupons
+  - name: Salaries
+  - name: Lineup
+  - name: Applicants
+  - name: Refunds
+  - name: Pricing
+  - name: Invoices
+  - name: System
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Create an account and send email verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "502": { $ref: "#/components/responses/ServerError" }
+        "503": { $ref: "#/components/responses/ServerError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/setup:
+    get:
+      tags: [Auth]
+      summary: Check whether initial setup is required
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Auth]
+      summary: Create the initial admin account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/accept-invite:
+    get:
+      tags: [Auth]
+      summary: Validate an invitation token
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/TokenQuery"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Auth]
+      summary: Accept an invitation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string, minLength: 16 }
+                password: { type: string, minLength: 8 }
+                name: { type: string, minLength: 1 }
+              additionalProperties: false
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/verify-email:
+    get:
+      tags: [Auth]
+      summary: Validate an email verification token
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/TokenQuery"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Auth]
+      summary: Verify email and start a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+              additionalProperties: true
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Resend an email verification link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+              additionalProperties: false
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current dashboard user
+      security:
+        - eyl_session: []
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Clear the dashboard session
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change the current user's password
+      security:
+        - eyl_session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, minLength: 1 }
+                newPassword: { type: string, minLength: 8 }
+              additionalProperties: false
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List users and pending invites
+      description: Cookie-authenticated dashboard administrators only.
+      security:
+        - eyl_session: []
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Admin]
+      summary: Invite a dashboard user
+      description: Cookie-authenticated dashboard administrators only.
+      security:
+        - eyl_session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [admin, operator], default: operator }
+              additionalProperties: false
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/admin/users/{id}:
+    delete:
+      tags: [Admin]
+      summary: Delete a dashboard user
+      description: Cookie-authenticated dashboard administrators only.
+      security:
+        - eyl_session: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/admin/invites/{id}:
+    delete:
+      tags: [Admin]
+      summary: Revoke a pending invitation
+      description: Cookie-authenticated dashboard administrators only.
+      security:
+        - eyl_session: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries:
+    get:
+      tags: [Deliveries]
+      summary: List deliveries
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: knight_id, in: query, schema: { type: string, format: uuid } }
+        - { name: payment_status, in: query, schema: { type: string } }
+        - { name: client_id, in: query, schema: { type: string, format: uuid } }
+        - { name: needs_review, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Deliveries]
+      summary: Create a delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliveryInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [Deliveries]
+      summary: Get a delivery
+      responses:
+        "200": { $ref: "#/components/responses/DeliverySuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [Deliveries]
+      summary: Update a delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliveryPatch"
+      responses:
+        "200": { $ref: "#/components/responses/DeliverySuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Deliveries]
+      summary: Delete a delivery
+      description: Cookie-authenticated dashboard administrators only. Deletion is idempotent.
+      security:
+        - eyl_session: []
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries/{id}/lifecycle:
+    patch:
+      tags: [Deliveries]
+      summary: Advance or cancel a delivery
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleAction"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries/next-serial:
+    get:
+      tags: [Deliveries]
+      summary: Get the next delivery serial number
+      parameters:
+        - { name: mode, in: query, schema: { type: string, enum: [online, b2b], default: online } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries/next-invoice:
+    get:
+      tags: [Deliveries]
+      summary: Get the next invoice number
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/deliveries/stream:
+    get:
+      tags: [Deliveries]
+      summary: Stream delivery changes
+      description: Requires a valid dashboard session cookie; API keys are not accepted by the stream handler.
+      security:
+        - eyl_session: []
+      responses:
+        "200":
+          description: Server-sent event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401":
+          description: Unauthorized plain-text response
+          content:
+            text/plain:
+              schema: { type: string }
+  /api/knights:
+    get:
+      tags: [Knights]
+      summary: List knights
+      parameters:
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: role, in: query, schema: { type: string, enum: [walker, biker] } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Knights]
+      summary: Create a knight
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnightInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/knights/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [Knights]
+      summary: Get a knight and salary history
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [Knights]
+      summary: Update a knight
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnightPatch"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Knights]
+      summary: Delete a knight
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/clients:
+    get:
+      tags: [Clients]
+      summary: List clients
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Clients]
+      summary: Create a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/clients/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [Clients]
+      summary: Get a client
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [Clients]
+      summary: Update a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientPatch"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Clients]
+      summary: Delete a client
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/rates:
+    get:
+      tags: [Rates]
+      summary: List rate tiers
+      parameters:
+        - { name: provider, in: query, schema: { type: string } }
+        - { name: current, in: query, schema: { type: boolean } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Rates]
+      summary: Create a rate tier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RateInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/rates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    patch:
+      tags: [Rates]
+      summary: Update a rate tier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatePatch"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Rates]
+      summary: Delete a rate tier
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/coupons:
+    get:
+      tags: [Coupons]
+      summary: List monthly coupons
+      parameters:
+        - { name: year_month, in: query, schema: { type: string, pattern: "^\\d{4}-\\d{2}$" } }
+        - { name: active, in: query, schema: { type: boolean } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Coupons]
+      summary: Create a monthly coupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/coupons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    patch:
+      tags: [Coupons]
+      summary: Update a monthly coupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponPatch"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Coupons]
+      summary: Delete a coupon and its redemptions
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/salaries:
+    get:
+      tags: [Salaries]
+      summary: List knight salaries
+      parameters:
+        - { name: knight_id, in: query, schema: { type: string, format: uuid } }
+        - { name: month, in: query, schema: { type: string, format: date } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Salaries]
+      summary: Upsert a knight salary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalaryInput"
+      responses:
+        "201": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/lineup:
+    get:
+      tags: [Lineup]
+      summary: Get a daily lineup
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Lineup]
+      summary: Replace a daily lineup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineupInput"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/eyl-knights/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [Applicants]
+      summary: Get an EYL knight application
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [Applicants]
+      summary: Review or update an EYL knight application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicantPatch"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [Applicants]
+      summary: Delete an EYL knight application
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/cancelled-orders/{id}/refund:
+    post:
+      tags: [Refunds]
+      summary: Process one cancelled-order refund
+      description: Requires a dashboard session cookie.
+      security:
+        - eyl_session: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/refunds/process-pending:
+    post:
+      tags: [Refunds]
+      summary: Process pending refunds
+      description: Accepts a dashboard session cookie for manual use or `x-api-key` for cron use.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/refunds/stream:
+    get:
+      tags: [Refunds]
+      summary: Stream and automatically process pending refunds
+      description: Requires a valid dashboard session cookie; API keys are not accepted by the stream handler.
+      security:
+        - eyl_session: []
+      responses:
+        "200":
+          description: Server-sent event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401":
+          description: Unauthorized plain-text response
+          content:
+            text/plain:
+              schema: { type: string }
+  /api/import:
+    post:
+      tags: [Deliveries]
+      summary: Bulk import deliveries
+      description: Accepts a dashboard session cookie or `x-api-key`; intended primarily for automation.
+      security:
+        - eyl_session: []
+        - api_key: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deliveries]
+              properties:
+                deliveries:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    $ref: "#/components/schemas/DeliveryInput"
+              additionalProperties: false
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/pricing/quote:
+    get:
+      tags: [Pricing]
+      summary: Quote delivery pricing from query inputs
+      parameters:
+        - { name: km, in: query, description: Distance; `distanceKm` is also accepted., schema: { type: number, exclusiveMinimum: 0 } }
+        - { name: distanceKm, in: query, schema: { type: number, exclusiveMinimum: 0 } }
+        - { name: isCake, in: query, schema: { type: boolean } }
+        - { name: isFood, in: query, schema: { type: boolean } }
+        - { name: delicateHandling, in: query, schema: { type: boolean } }
+        - { name: isFragile, in: query, schema: { type: boolean } }
+        - { name: keepUpright, in: query, schema: { type: boolean } }
+        - { name: isLiquid, in: query, schema: { type: boolean } }
+        - { name: temperatureSensitive, in: query, schema: { type: boolean } }
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Pricing]
+      summary: Quote an order after walker transport selection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+              additionalProperties: true
+      responses:
+        "200": { $ref: "#/components/responses/JsonSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/invoices/{id}/html:
+    get:
+      tags: [Invoices]
+      summary: Render an invoice as HTML
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - { name: download, in: query, description: Set to `1` for an attachment., schema: { type: string, enum: ["1"] } }
+      responses:
+        "200":
+          description: Rendered invoice
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          description: Invoice not found
+          content:
+            text/plain:
+              schema: { type: string }
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health and configuration status
+      security: []
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, service, supabaseConfigured, time]
+                properties:
+                  ok: { type: boolean, const: true }
+                  service: { type: string, const: eyl-backend-dashboard }
+                  supabaseConfigured: { type: boolean }
+                  time: { type: string, format: date-time }
+                additionalProperties: false
+components:
+  securitySchemes:
+    eyl_session:
+      type: apiKey
+      in: cookie
+      name: eyl_session
+      description: HttpOnly dashboard session cookie.
+    api_key:
+      type: apiKey
+      in: header
+      name: x-api-key
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    TokenQuery:
+      name: token
+      in: query
+      required: true
+      schema: { type: string }
+  responses:
+    JsonSuccess:
+      description: Successful JSON response
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    DeliverySuccess:
+      description: Delivery record
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DeliveryRecord"
+    BadRequest:
+      description: Invalid JSON, query, or validated input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Authenticated but not permitted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: Server or upstream error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+      additionalProperties: true
+    ValidationError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            details:
+              description: Optional flattened validation details.
+          additionalProperties: true
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+      additionalProperties: false
+    SignupInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string, minLength: 1 }
+      additionalProperties: false
+    DeliveryRecord:
+      type: object
+      description: Large database-backed delivery row; extra live columns may be present.
+      properties:
+        id: { type: string, format: uuid }
+        serial_no: { type: [integer, "null"] }
+        booking_date: { type: [string, "null"], format: date }
+        task_date: { type: [string, "null"], format: date }
+        mode_of_booking: { type: [string, "null"], enum: [b2b, online, null] }
+        sender_name: { type: [string, "null"] }
+        pickup_location: { type: [string, "null"] }
+        drop_location: { type: [string, "null"] }
+        knight_id: { type: [string, "null"], format: uuid }
+        knight_name: { type: [string, "null"] }
+        fulfillment_status: { type: [string, "null"] }
+        payment_status: { type: [string, "null"] }
+        final_bill_amount: { type: [number, "null"] }
+        invoice_no: { type: [string, "null"] }
+      additionalProperties: true
+    DeliveryInput:
+      type: object
+      required:
+        - serial_no
+        - booking_date
+        - task_date
+        - mode_of_booking
+        - sender_name
+        - pickup_location
+        - pickup_time_window
+        - pickup_actual_time
+        - drop_location
+        - drop_recipient_name
+        - recipient_phone
+        - drop_time_window
+        - drop_actual_time
+        - fulfillment_status
+        - fees
+        - kms
+        - payment_status
+        - final_bill_amount
+        - payment_mode
+      properties:
+        serial_no: { type: [number, string] }
+        booking_date: { type: string, format: date }
+        task_date: { type: string, format: date }
+        mode_of_booking: { type: string, enum: [b2b, online] }
+        sender_name: { type: string }
+        sender_last_name: { type: [string, "null"] }
+        pickup_location: { type: string }
+        pickup_lat: { type: [number, "null"] }
+        pickup_lng: { type: [number, "null"] }
+        pickup_time_window: { type: string }
+        pickup_actual_time: { type: string }
+        drop_location: { type: string }
+        drop_lat: { type: [number, "null"] }
+        drop_lng: { type: [number, "null"] }
+        drop_recipient_name: { type: string }
+        recipient_phone: { type: string }
+        drop_time_window: { type: string }
+        drop_actual_time: { type: string }
+        knight_id: { type: [string, "null"], format: uuid }
+        knight_name: { type: [string, "null"] }
+        assignment_status: { type: string, enum: [assigned, cancelled] }
+        fulfillment_status: { type: string, enum: [booked, accepted, active, completed, cancelled] }
+        fees: { type: [number, string] }
+        kms: { type: [number, string] }
+        working_hours: { type: [string, "null"] }
+        cod_remark: { type: [string, "null"] }
+        cab_auto_fare: { type: [string, "null"] }
+        payment_status: { type: string, enum: [paid, unpaid, free, partial] }
+        final_bill_amount: { type: [number, string] }
+        payment_mode: { type: string }
+        payment_received_date: { type: [string, "null"], format: date }
+        billing_name: { type: [string, "null"] }
+        billing_address: { type: [string, "null"] }
+        gst_no: { type: [string, "null"] }
+        invoice_no: { type: [string, "null"] }
+        invoice_date: { type: [string, "null"], format: date }
+        client_id: { type: [string, "null"], format: uuid }
+        content: { type: [string, "null"] }
+        remark: { type: [string, "null"] }
+        needs_review: { type: boolean }
+      additionalProperties: false
+    DeliveryPatch:
+      type: object
+      description: Any subset of the fields documented by DeliveryInput.
+      additionalProperties: true
+    LifecycleAction:
+      oneOf:
+        - type: object
+          required: [action]
+          properties:
+            action: { const: confirm }
+          additionalProperties: false
+        - type: object
+          required: [action]
+          properties:
+            action: { const: assign }
+            knight_id: { type: [string, "null"], format: uuid }
+            knight_name: { type: [string, "null"], minLength: 1 }
+            pickup_scheduled_at: { type: [string, "null"], format: date-time }
+            delivery_scheduled_at: { type: [string, "null"], format: date-time }
+          additionalProperties: false
+        - type: object
+          required: [action]
+          properties:
+            action: { type: string, enum: [pickup, deliver, cancel] }
+          additionalProperties: false
+    KnightInput:
+      type: object
+      required: [full_name, display_name]
+      properties:
+        full_name: { type: string, minLength: 1 }
+        display_name: { type: string, minLength: 1 }
+        role: { type: [string, "null"], enum: [walker, biker, null] }
+        joining_date: { type: [string, "null"], format: date }
+        default_location: { type: [string, "null"] }
+        active: { type: boolean, default: true }
+        note: { type: [string, "null"] }
+      additionalProperties: false
+    KnightPatch:
+      type: object
+      description: Any subset of the fields documented by KnightInput.
+      additionalProperties: true
+    ClientInput:
+      type: object
+      required: [client_name]
+      properties:
+        client_name: { type: string, minLength: 1 }
+        company_name: { type: [string, "null"] }
+        address: { type: [string, "null"] }
+        gst_no: { type: [string, "null"] }
+        phone: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+      additionalProperties: false
+    ClientPatch:
+      type: object
+      description: Any subset of the fields documented by ClientInput.
+      additionalProperties: true
+    RateInput:
+      type: object
+      required: [provider]
+      properties:
+        provider: { type: string, minLength: 1 }
+        label: { type: [string, "null"] }
+        min_km: { type: [number, "null"] }
+        max_km: { type: [number, "null"] }
+        fee: { type: [number, "null"] }
+        fee_ex_gst: { type: [number, "null"] }
+        gst_amount: { type: [number, "null"] }
+        effective_from: { type: [string, "null"], format: date }
+        is_current: { type: boolean, default: true }
+        note: { type: [string, "null"] }
+      additionalProperties: false
+    RatePatch:
+      type: object
+      description: Any subset of the fields documented by RateInput.
+      additionalProperties: true
+    CouponInput:
+      type: object
+      required: [year_month, code, type, value, label]
+      properties:
+        year_month: { type: string, pattern: "^\\d{4}-\\d{2}$" }
+        code: { type: string, minLength: 1 }
+        type: { type: string, enum: [percent, flat] }
+        value: { type: integer, minimum: 1 }
+        label: { type: string, minLength: 1 }
+        active: { type: boolean, default: true }
+      additionalProperties: false
+    CouponPatch:
+      type: object
+      description: Any subset of the fields documented by CouponInput.
+      additionalProperties: true
+    SalaryInput:
+      type: object
+      required: [knight_id, month]
+      properties:
+        knight_id: { type: string, format: uuid }
+        month:
+          type: string
+          description: YYYY-MM or YYYY-MM-DD; normalized to the first of the month.
+          pattern: "^\\d{4}-\\d{2}(?:-\\d{2})?$"
+        travel: { type: number, default: 0 }
+        salary: { type: number, default: 0 }
+        total: { type: [number, "null"] }
+      additionalProperties: false
+    LineupInput:
+      type: object
+      required: [work_date]
+      properties:
+        work_date: { type: string, format: date }
+        is_sunday: { type: boolean }
+        note: { type: [string, "null"] }
+        assignments:
+          type: array
+          default: []
+          items:
+            type: object
+            properties:
+              knight_id: { type: [string, "null"], format: uuid }
+              knight_name: { type: [string, "null"] }
+              role: { type: [string, "null"], enum: [walker, biker, null] }
+              location: { type: [string, "null"] }
+              shift_time: { type: [string, "null"] }
+              status: { type: string, enum: [working, leave, half_day] }
+              note: { type: [string, "null"] }
+              position: { type: [number, "null"] }
+            additionalProperties: false
+      additionalProperties: false
+    ApplicantPatch:
+      type: object
+      properties:
+        status: { type: string, enum: [pending, documents, submitted, approved, rejected] }
+        review_note: { type: [string, "null"] }
+        knight_id: { type: [string, "null"], format: uuid }
+        knight_role: { type: [string, "null"], enum: [walker, biker, null] }
+      additionalProperties: false

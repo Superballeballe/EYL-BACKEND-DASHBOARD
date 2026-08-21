@@ -1,0 +1,197 @@
+openapi: 3.1.0
+info:
+  title: EYL Supabase Edge Functions
+  version: 1.0.0
+  description: |
+    Contract for the currently deployed EYL-APP Edge Function inventory.
+    JWT requirements reflect live production. In particular, the checked-in
+    `config.toml` is stale for `razorpay-refund`; the deployed function requires
+    a Supabase JWT. Payloads not available in this repository are intentionally
+    represented as generic JSON objects rather than inferred fields.
+servers:
+  - url: https://mjoddxztryqjtjaseusc.supabase.co/functions/v1
+    description: Live Supabase project
+tags:
+  - name: AI
+  - name: Messaging
+  - name: Payments
+  - name: Account
+  - name: Utilities
+paths:
+  /parse-intent:
+    post:
+      tags: [AI]
+      summary: Parse a user's intent
+      description: JWT-protected. Exact request and response fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /transcribe:
+    post:
+      tags: [AI]
+      summary: Transcribe submitted audio
+      description: JWT-protected. The exact upload format and response fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/GenericObject" } }
+          multipart/form-data: { schema: { type: object, additionalProperties: true } }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /whatsapp-webhook:
+    get:
+      tags: [Messaging]
+      summary: Verify the WhatsApp webhook
+      description: Public webhook verification endpoint. Exact query fields were not inspected here.
+      security: []
+      responses:
+        "200":
+          description: Webhook verification response
+          content:
+            text/plain: { schema: { type: string } }
+            application/json: { schema: { $ref: "#/components/schemas/GenericObject" } }
+        "400": { $ref: "#/components/responses/Error" }
+    post:
+      tags: [Messaging]
+      summary: Receive WhatsApp webhook events
+      description: Public provider callback. Exact event payload fields were not inspected here.
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /send-auth-email:
+    post:
+      tags: [Messaging]
+      summary: Send an authentication email
+      description: Public Edge Function at the platform gateway; the function performs its own request validation.
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /send-signup-code:
+    post:
+      tags: [Messaging]
+      summary: Send a signup verification code
+      description: Public Edge Function at the platform gateway; exact payload fields were not inspected here.
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /send-account-notice:
+    post:
+      tags: [Messaging]
+      summary: Send an account notification
+      description: Public Edge Function at the platform gateway; exact payload fields were not inspected here.
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /razorpay-order:
+    post:
+      tags: [Payments]
+      summary: Create a Razorpay order
+      description: JWT-protected. Exact payment payload fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /razorpay-verify:
+    post:
+      tags: [Payments]
+      summary: Verify a Razorpay payment
+      description: JWT-protected. Exact verification payload fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /verify-otp-code:
+    post:
+      tags: [Account]
+      summary: Verify a one-time code
+      description: JWT-protected. Exact verification payload fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /validate-coupon:
+    post:
+      tags: [Payments]
+      summary: Validate a coupon
+      description: JWT-protected. Exact coupon payload and result fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /realtime-token:
+    post:
+      tags: [Account]
+      summary: Issue realtime authorization data
+      description: JWT-protected. Exact request and token response fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /delete-account:
+    post:
+      tags: [Account]
+      summary: Delete the authenticated account
+      description: JWT-protected destructive account operation. Exact payload fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /verify-gstin:
+    post:
+      tags: [Utilities]
+      summary: Verify a GSTIN
+      description: JWT-protected. Exact lookup payload and provider response fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /geocode:
+    post:
+      tags: [Utilities]
+      summary: Geocode a location
+      description: JWT-protected. Exact geocoding payload and provider response fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+  /razorpay-refund:
+    post:
+      tags: [Payments]
+      summary: Create or reconcile a Razorpay refund
+      description: |
+        JWT-protected in live production. The checked-in `config.toml` setting is
+        stale and must not be used to infer this function is public. Exact payload
+        fields were not inspected here.
+      security: [{ supabase_jwt: [] }]
+      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
+      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
+components:
+  securitySchemes:
+    supabase_jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Supabase access token sent as `Authorization: Bearer <jwt>`."
+  requestBodies:
+    GenericJson:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GenericObject"
+  responses:
+    GenericJson:
+      description: Successful function response; exact fields were not inspected.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GenericObject"
+    Error:
+      description: Function or gateway error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    GenericObject:
+      type: object
+      additionalProperties: true
+    Error:
+      type: object
+      description: Error shape varies between the Supabase gateway and individual functions.
+      properties:
+        error: { type: [string, object] }
+        message: { type: string }
+      additionalProperties: true
