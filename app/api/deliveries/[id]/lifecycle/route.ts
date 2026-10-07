@@ -2,10 +2,8 @@ import { z } from "zod";
 import { badRequest, notFound, ok, parseBody, serverError } from "@/lib/api";
 import { isWithinWorkingHours, workingHoursError } from "@/lib/format";
 import {
-  sendDeliveredNotification,
   sendOrderAssignedNotification,
   sendOrderConfirmedNotification,
-  sendPickupNotification,
 } from "@/lib/server/expoPush";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -512,18 +510,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
           });
         } catch (error) {
           console.warn("[notifications] failed to send assignment push:", error);
-        }
-      } else if (action.action === "pickup") {
-        try {
-          await sendPickupNotification(db, { orderId: linkedDelivery.app_order_id });
-        } catch (error) {
-          console.warn("[notifications] failed to send pickup push:", error);
-        }
-      } else if (action.action === "deliver") {
-        try {
-          await sendDeliveredNotification(db, { orderId: linkedDelivery.app_order_id });
-        } catch (error) {
-          console.warn("[notifications] failed to send delivered push:", error);
         }
       }
     }
