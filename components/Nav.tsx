@@ -26,6 +26,7 @@ import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
+import PhoneInTalkOutlinedIcon from "@mui/icons-material/PhoneInTalkOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
 import { gray } from "@/lib/surface";
@@ -46,6 +47,7 @@ const LINKS = [
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
   { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
+  { href: "/hub-contacts", label: "Hub contacts", Icon: PhoneInTalkOutlinedIcon },
   { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
 ] as const;
 

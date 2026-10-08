@@ -254,3 +254,13 @@ export type CancelledOrder = {
   refund_ref?: string | null;
   refunded_at?: string | null;
 };
+
+export type HubContact = {
+  id: string;
+  label: string;
+  description: string | null;
+  phone: string;
+  sort_order: number;
+  active: boolean;
+  updated_at: string | null;
+};

@@ -24,6 +24,7 @@ The consumer and knight apps both create Supabase clients with the **anon key** 
 | `cancelled_orders` | Select own cancellation/refund rows | **Live verified:** `authenticated` has `SELECT` and `cancelled_orders_select_own` limits rows to `user_id=auth.uid()`. |
 | `monthly_coupons` | Select active coupon metadata | Read policy; validation/discount calculation is performed by Edge Function. |
 | `coupon_redemptions` | Select own redemption markers | Used for display; insert is trigger/function controlled. |
+| `hub_contacts` | Select active "Call the Hub" contacts (`id,label,description,phone,sort_order`) | Column grant + `hub_contacts_read_active`; writes are admin-only (`get_my_role()='admin'`), at most 10 active rows (trigger). Managed from the dashboard's Hub contacts page. |
 | `app_push_tokens` | Upsert own Expo token | User-scoped policies. |
 
 Sources: [booking service](../../../EYL-APP/src/services/bookingService.js), [address service](../../../EYL-APP/src/services/savedAddressService.js), [coupon service](../../../EYL-APP/src/services/couponService.js), [notification service](../../../EYL-APP/src/services/notificationService.js).

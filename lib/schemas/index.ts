@@ -325,3 +325,27 @@ function percentMaxRefine(data: { type?: "percent" | "flat"; value?: number }, c
 export const monthlyCouponSchema = monthlyCouponBaseSchema.superRefine(percentMaxRefine);
 export const monthlyCouponUpdateSchema = monthlyCouponBaseSchema.partial().superRefine(percentMaxRefine);
 export type MonthlyCouponInput = z.infer<typeof monthlyCouponSchema>;
+
+// ---- hub contacts ("Call the Hub" in the app) -------------------------------
+// Limits mirror the hub_contacts table checks (EYL-APP 20261008130000_hub_contacts.sql).
+export const HUB_CONTACTS_MAX_ACTIVE = 10;
+
+const hubContactBaseSchema = z.object({
+  label: z.string().trim().min(1, "Label is required").max(40, "Label can be at most 40 characters"),
+  description: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((s) => s || null),
+  // Spaces, dashes and brackets are dropped so "+91 98765-43210" saves as +919876543210.
+  phone: z
+    .string()
+    .transform((s) => s.replace(/[\s\-()]/g, ""))
+    .pipe(z.string().regex(/^\+[1-9][0-9]{7,14}$/, "Use + and the country code, e.g. +919876543210")),
+  sort_order: z.coerce.number().int().default(0),
+  active: z.boolean().default(true),
+});
+
+export const hubContactSchema = hubContactBaseSchema;
+export const hubContactUpdateSchema = hubContactBaseSchema.partial();
+export type HubContactInput = z.infer<typeof hubContactSchema>;

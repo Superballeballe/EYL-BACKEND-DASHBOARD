@@ -81,6 +81,9 @@ Body field definitions are in [`lib/schemas/index.ts`](../../lib/schemas/index.t
 | Cookie/API key | `GET /api/coupons` | `year_month`, `active=true` | Coupons. [Source](../../app/api/coupons/route.ts) |
 | Cookie/API key | `POST /api/coupons` | `{year_month,code,type:percent\|flat,value,label,active?}` | Creates uppercase code (`201`). |
 | Cookie/API key | `PATCH/DELETE /api/coupons/:id` | Patch: any coupon fields | Update; delete first removes redemption rows. [Source](../../app/api/coupons/[id]/route.ts) |
+| Cookie/API key | `GET /api/hub-contacts` | `active=true` | "Call the Hub" contacts in app order (`sort_order`, then `label`). [Source](../../app/api/hub-contacts/route.ts) |
+| Cookie/API key | `POST /api/hub-contacts` | `{label,phone,description?,sort_order?,active?}` | Creates contact (`201`). Phone is normalised to E.164 (spaces/dashes dropped); an 11th active contact is refused with `400`. |
+| Cookie/API key | `PATCH/DELETE /api/hub-contacts/:id` | Patch: any contact fields | Update (same checks) or delete. [Source](../../app/api/hub-contacts/[id]/route.ts) |
 | Cookie/API key | `GET /api/salaries` | `knight_id`, `month` | Salaries with knight. [Source](../../app/api/salaries/route.ts) |
 | Cookie/API key | `POST /api/salaries` | `{knight_id,month:YYYY-MM,travel,salary,total?}` | Upserts by knight/month; derives total when omitted (`201`). |
 | Cookie/API key | `GET /api/lineup` | Required `date=YYYY-MM-DD` | `{work_day,assignments}`. [Source](../../app/api/lineup/route.ts) |
