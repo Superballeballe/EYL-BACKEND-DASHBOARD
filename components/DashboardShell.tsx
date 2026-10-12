@@ -507,7 +507,6 @@ export default function DashboardShell(props: Props) {
 
     const refunds = new EventSource("/api/refunds/stream");
     refunds.addEventListener("change", refresh);
-    refunds.addEventListener("processed", refresh);
 
     return () => {
       if (debounce) clearTimeout(debounce);
