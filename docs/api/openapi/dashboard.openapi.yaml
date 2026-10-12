@@ -681,19 +681,14 @@ paths:
   /api/refunds/process-pending:
     post:
       tags: [Refunds]
-      summary: Process pending refunds
-      description: Accepts a dashboard session cookie for manual use or `x-api-key` for cron use.
-      parameters:
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      summary: Retired (410)
+      description: Retired. The dashboard no longer processes refunds; always returns 410 with `{processed:0}`.
       responses:
-        "200": { $ref: "#/components/responses/JsonSuccess" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "500": { $ref: "#/components/responses/ServerError" }
+        "410": { description: Gone }
   /api/refunds/stream:
     get:
       tags: [Refunds]
-      summary: Stream and automatically process pending refunds
+      summary: Notify open tabs that refund data changed (never processes refunds)
       description: Requires a valid dashboard session cookie; API keys are not accepted by the stream handler.
       security:
         - eyl_session: []

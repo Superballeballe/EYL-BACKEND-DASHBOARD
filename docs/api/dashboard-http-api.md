@@ -58,7 +58,7 @@ Delivery payload fields are defined in [`lib/schemas/index.ts`](../../lib/schema
 
 ### Lifecycle cancellation
 
-For a linked paid app order, dashboard cancellation hardcodes a rounded 10% fee, creates `cancelled_orders` with a pending refund for the remainder, marks `orders` and `deliveries` cancelled, decrements the assigned knight's `orders_today`, and records refund metadata on the invoice. Cancellation is blocked after pickup. See [order lifecycle](order-lifecycle.md).
+For a linked app order, dashboard cancellation calls the service-role RPC `ops_cancel_order(p_order_id, p_reason, p_actor)` with the signed-in user as actor. The database cancels the order and delivery, writes `cancelled_orders` with no fee, and queues a 100% refund for a paid order. Cancellation is refused after pickup ("Can't cancel after pickup"). See [order lifecycle](order-lifecycle.md).
 
 ## Ops data
 
@@ -93,10 +93,13 @@ Body field definitions are in [`lib/schemas/index.ts`](../../lib/schemas/index.t
 
 | Auth | Method and path | Request | Response and side effects |
 |---|---|---|---|
-| Session | `POST /api/cancelled-orders/:id/refund` | Path cancellation UUID | Processes one refund, idempotently returns `{ok,refund_id,amount,already}`. [Source](../../app/api/cancelled-orders/[id]/refund/route.ts) |
-| Session or API key | `POST /api/refunds/process-pending?limit=1..100` | Default limit `20` | Processes oldest pending refunds; source is `manual` for session or `cron` for API key. Returns counts and per-item results. [Source](../../app/api/refunds/process-pending/route.ts) |
+| Session | `POST /api/cancelled-orders/:id/refund` | Path cancellation UUID | Retries a **failed** refund through `ops-refund` `retry`. Other statuses are refused. [Source](../../app/api/cancelled-orders/[id]/refund/route.ts) |
+| Session | `POST /api/refunds/orders/:orderId` | `{note?}` | Manual refund through `ops-refund`, only for a failed refund, a paid order after pickup, or a paid cancelled order with no refund queued. [Source](../../app/api/refunds/orders/[orderId]/route.ts) |
+| Session | `POST /api/refunds/reviews/:id` | `{review_action: "refund"\|"resolve", note?, reference?}` | Payment review action through `ops-refund` `review`; resolve needs a note. [Source](../../app/api/refunds/reviews/[id]/route.ts) |
+| Admin | `POST /api/refunds/mode` | `{mode: "live"\|"dry_run"\|"off", reason}` | Calls `ops_set_auto_refund_mode`; the note records the admin. [Source](../../app/api/refunds/mode/route.ts) |
+| Any | `POST/GET /api/refunds/process-pending` | — | Retired: `410`, does nothing. |
 
-Manual, automatic and cron processing all append `refund_events` with success/failure/skipped outcome. Successful processing updates `cancelled_orders` and invoice metadata. See [`lib/server/processRefund.ts`](../../lib/server/processRefund.ts).
+The dashboard never processes refunds on its own. Automatic refunds belong to the database worker; every dashboard money move is an explicit ops click through `ops-refund` ([`lib/server/opsRefund.ts`](../../lib/server/opsRefund.ts)) with the signed-in user as `actor`.
 
 ## Non-JSON endpoints
 
