@@ -5,6 +5,13 @@ import {
   sendOrderAssignedNotification,
   sendOrderConfirmedNotification,
 } from "@/lib/server/expoPush";
+import {
+  assignBlockedReason,
+  confirmBlockedReason,
+  friendlyOrderUpdateError,
+  isOrderGuardError,
+  type AppInvoiceGuardInput,
+} from "@/lib/appOrderLifecycle";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -284,14 +291,17 @@ async function getKnightProfileId(knightId: string | null | undefined) {
   return (data?.profile_id as string | null | undefined) ?? null;
 }
 
-async function getAppInvoicePaymentStatus(db: ReturnType<typeof supabaseAdmin>, orderId: string) {
+async function getAppInvoice(
+  db: ReturnType<typeof supabaseAdmin>,
+  orderId: string,
+): Promise<AppInvoiceGuardInput> {
   const { data, error } = await db
     .from("invoices")
-    .select("payment_status")
+    .select("payment_status, total_amount")
     .eq("order_id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return String(data?.payment_status ?? "pending").toLowerCase();
+  return (data as AppInvoiceGuardInput) ?? null;
 }
 
 function legacyOrderStatus(status: unknown) {
@@ -323,6 +333,9 @@ async function updateLinkedOrder(db: ReturnType<typeof supabaseAdmin>, orderId: 
 
   let result = await update(desiredPatch);
   if (!result.error) return result;
+  // A pay-first guard said no (not paid / window closed). Retrying with only
+  // the status would move the order on without confirming it.
+  if (isOrderGuardError(result.error)) return result;
 
   let fallbackPatch = stripNewOrderColumns(desiredPatch);
   if (Object.keys(fallbackPatch).length === 0) return result;
@@ -366,48 +379,42 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
       const { data: appOrder, error: orderError } = await db
         .from("orders")
-        .select("status, confirmed_at")
+        .select("status, confirmed_at, confirm_deadline_at")
         .eq("id", linkedDelivery.app_order_id)
         .maybeSingle();
       if (orderError) return serverError(orderError);
-      if (isAppOrderCancelled(appOrder)) {
-        return badRequest("This app order was cancelled.");
-      }
-      if (appOrder?.confirmed_at) {
-        return badRequest("Order is already confirmed.");
-      }
+      if (!appOrder) return notFound("Linked app order not found");
 
-      const paymentStatus = await getAppInvoicePaymentStatus(db, linkedDelivery.app_order_id);
-      if (paymentStatus === "paid") {
-        return badRequest("Order is already paid.");
-      }
+      // Pay-first: the customer pays, then ops confirm before the deadline.
+      const invoice = await getAppInvoice(db, linkedDelivery.app_order_id);
+      const blocked = confirmBlockedReason(appOrder, invoice);
+      if (blocked) return badRequest(blocked);
 
       deliveryPatch.fulfillment_status = "accepted";
       orderPatch.confirmed_at = stamp;
       orderPatch.accepted_at = stamp;
       orderPatch.status = "accepted";
     } else if (action.action === "assign") {
+      const profileId = await getKnightProfileId(action.knight_id);
       if (linkedDelivery.app_order_id) {
         const { data: appOrder, error: orderError } = await db
           .from("orders")
-          .select("status, confirmed_at, assigned_knight_id, pending_knight_id")
+          .select("status, confirmed_at, confirm_deadline_at, assigned_knight_id, pending_knight_id")
           .eq("id", linkedDelivery.app_order_id)
           .maybeSingle();
         if (orderError) return serverError(orderError);
         if (isAppOrderCancelled(appOrder)) {
           return badRequest("This app order was cancelled — restore it before assigning a knight.");
         }
-        if (!appOrder?.confirmed_at) {
-          return badRequest("Confirm the order first, then wait for customer payment.");
-        }
-
-        const paymentStatus = await getAppInvoicePaymentStatus(db, linkedDelivery.app_order_id);
-        if (paymentStatus !== "paid") {
-          return badRequest("Wait for customer payment before assigning a knight.");
-        }
-        if (appOrder.assigned_knight_id) {
+        if (appOrder?.assigned_knight_id) {
           return badRequest("A knight is already assigned to this order.");
         }
+
+        const invoice = await getAppInvoice(db, linkedDelivery.app_order_id);
+        const blocked = assignBlockedReason(appOrder, invoice, {
+          setsAppKnight: Boolean(profileId),
+        });
+        if (blocked) return badRequest(blocked);
       }
 
       const scheduleError = validateScheduleTimes(action.pickup_scheduled_at, action.delivery_scheduled_at);
@@ -436,7 +443,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
       orderPatch.pickup_scheduled_at = action.pickup_scheduled_at ?? null;
       orderPatch.delivery_scheduled_at = action.delivery_scheduled_at ?? null;
 
-      const profileId = await getKnightProfileId(action.knight_id);
       if (profileId) {
         orderPatch.assigned_knight_id = profileId;
       }
@@ -476,6 +482,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
       }
     }
 
+    // Confirm writes the order first: if the DB guard refuses, the delivery
+    // must not move to accepted on its own.
+    let updatedOrder = null;
+    if (action.action === "confirm" && linkedDelivery.app_order_id) {
+      const { data, error } = await updateLinkedOrder(db, linkedDelivery.app_order_id, orderPatch);
+      if (error) {
+        console.error("[lifecycle] confirm app order failed:", error);
+        const message = friendlyOrderUpdateError(error, "confirm");
+        return isOrderGuardError(error) ? badRequest(message) : serverError(new Error(message));
+      }
+      updatedOrder = data;
+    }
+
     let updatedDelivery = null;
     if (Object.keys(deliveryPatch).length) {
       const { data, error } = await db
@@ -488,11 +507,18 @@ export async function PATCH(req: Request, { params }: Ctx) {
       updatedDelivery = data;
     }
 
-    let updatedOrder = null;
     if (linkedDelivery.app_order_id && Object.keys(orderPatch).length) {
-      const { data, error } = await updateLinkedOrder(db, linkedDelivery.app_order_id, orderPatch);
-      if (error) return serverError(error);
-      updatedOrder = data;
+      if (action.action !== "confirm") {
+        const { data, error } = await updateLinkedOrder(db, linkedDelivery.app_order_id, orderPatch);
+        if (error) {
+          if (action.action === "assign" && isOrderGuardError(error)) {
+            console.error("[lifecycle] assign app order failed:", error);
+            return badRequest(friendlyOrderUpdateError(error, "assign"));
+          }
+          return serverError(error);
+        }
+        updatedOrder = data;
+      }
 
       if (action.action === "confirm") {
         try {
