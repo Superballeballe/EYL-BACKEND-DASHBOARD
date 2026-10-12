@@ -19,7 +19,7 @@ export default async function CancelledOrdersPage() {
     <div>
       <PageHeader
         title="Cancelled orders"
-        subtitle="Customer cancellations with reason. Pending refunds are processed automatically; use Refund to retry manually."
+        subtitle="Cancellations with reason. A paid order cancelled before pickup is refunded in full, automatically. Only a failed refund needs a retry."
       />
       <CancelledOrdersTable rows={rows} />
     </div>

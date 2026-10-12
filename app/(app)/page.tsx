@@ -142,7 +142,7 @@ async function getData(today: string) {
       db
         .from("cancelled_orders")
         .select("*")
-        .eq("refund_status", "pending")
+        .in("refund_status", ["pending", "processing", "failed"])
         .order("cancelled_at", { ascending: false })
         .limit(80),
     ]);

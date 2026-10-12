@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Box,
   Chip,
@@ -10,16 +11,11 @@ import {
   Typography,
 } from "@mui/material";
 import { EmptyState } from "@/components/ui";
-import RefundCustomerButton from "@/components/RefundCustomerButton";
+import RetryRefundButton from "@/components/RetryRefundButton";
 import { fmtDateTime, money } from "@/lib/format";
+import { cancelledRefundPaise, formatPaise, originOfCancellation, refundOriginLabel, refundStatusInfo } from "@/lib/refunds";
 import { tableShellSx } from "@/lib/surface";
 import type { CancelledOrder } from "@/lib/types";
-
-function refundChip(status: CancelledOrder["refund_status"]) {
-  if (status === "pending") return <Chip size="small" color="warning" label="Refund pending" />;
-  if (status === "refunded") return <Chip size="small" color="success" label="Refunded" />;
-  return <Chip size="small" variant="outlined" label="No refund" />;
-}
 
 export default function CancelledOrdersTable({
   rows,
@@ -55,51 +51,71 @@ export default function CancelledOrdersTable({
             <TableCell>Order · route</TableCell>
             <TableCell>Reason</TableCell>
             <TableCell>Stage</TableCell>
-            <TableCell align="right">Total</TableCell>
-            <TableCell align="right">Fee kept</TableCell>
+            <TableCell align="right">Paid</TableCell>
             <TableCell align="right">Refund</TableCell>
             <TableCell>Status</TableCell>
             <TableCell />
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDateTime(row.cancelled_at)}</TableCell>
-              <TableCell>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {row.order_code || "—"}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                  {[row.pickup_address, row.delivery_address].filter(Boolean).join(" → ") || "—"}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">{row.reason_label}</Typography>
-                {row.reason_note ? (
+          {rows.map((row) => {
+            const status = refundStatusInfo(row.refund_status);
+            const refundPaise = cancelledRefundPaise(row);
+            return (
+              <TableRow key={row.id}>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDateTime(row.cancelled_at)}</TableCell>
+                <TableCell>
+                  {row.order_id ? (
+                    <Link href={`/refunds/orders/${row.order_id}`} style={{ fontWeight: 600 }}>
+                      {row.order_code || "—"}
+                    </Link>
+                  ) : (
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {row.order_code || "—"}
+                    </Typography>
+                  )}
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                    {row.reason_note}
+                    {[row.pickup_address, row.delivery_address].filter(Boolean).join(" → ") || "—"}
                   </Typography>
-                ) : null}
-              </TableCell>
-              <TableCell>{row.was_confirmed ? "Confirmed" : "Unconfirmed"}</TableCell>
-              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {money(row.total_amount)}
-              </TableCell>
-              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {money(row.cancellation_fee)}
-              </TableCell>
-              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                {money(row.refund_amount)}
-              </TableCell>
-              <TableCell>{refundChip(row.refund_status)}</TableCell>
-              <TableCell>
-                {row.refund_status === "pending" && row.refund_amount > 0 ? (
-                  <RefundCustomerButton id={row.id} amount={row.refund_amount} />
-                ) : null}
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{row.reason_label}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                    {refundOriginLabel(originOfCancellation(row))}
+                    {row.reason_note ? ` · ${row.reason_note}` : ""}
+                  </Typography>
+                </TableCell>
+                <TableCell>{row.was_confirmed ? "Confirmed" : "Unconfirmed"}</TableCell>
+                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {money(row.total_amount)}
+                </TableCell>
+                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                  {row.refund_status === "none" ? "—" : formatPaise(refundPaise)}
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    color={status.color}
+                    variant={status.color === "default" ? "outlined" : "filled"}
+                    label={status.label}
+                  />
+                  {row.refund_ref ? (
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                      {row.refund_ref}
+                    </Typography>
+                  ) : null}
+                  {row.refund_status === "failed" && row.refund_last_error ? (
+                    <Typography variant="caption" sx={{ color: "error.main", display: "block" }}>
+                      {row.refund_last_error}
+                    </Typography>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  {row.refund_status === "failed" ? <RetryRefundButton id={row.id} amountPaise={refundPaise} /> : null}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>

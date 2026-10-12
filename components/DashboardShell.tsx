@@ -27,7 +27,8 @@ import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
 import { EmptyState } from "@/components/ui";
-import RefundCustomerButton from "@/components/RefundCustomerButton";
+import RetryRefundButton from "@/components/RetryRefundButton";
+import { cancelledRefundPaise, formatPaise, refundStatusInfo } from "@/lib/refunds";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
 import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format";
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
@@ -393,11 +394,9 @@ function RefundPendingTable({ rows, emptyMessage }: { rows: CancelledOrder[]; em
             <TableCell>Order · route</TableCell>
             <TableCell>Reason</TableCell>
             <TableCell sx={{ width: "7rem" }} align="right">
-              Fee kept
-            </TableCell>
-            <TableCell sx={{ width: "7rem" }} align="right">
               Refund
             </TableCell>
+            <TableCell sx={{ width: "10rem" }}>Status</TableCell>
             <TableCell sx={{ width: "9rem" }} />
           </TableRow>
         </TableHead>
@@ -420,14 +419,16 @@ function RefundPendingTable({ rows, emptyMessage }: { rows: CancelledOrder[]; em
                     </Typography>
                   ) : null}
                 </TableCell>
-                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                  {money(row.cancellation_fee)}
-                </TableCell>
                 <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                  {money(row.refund_amount)}
+                  {formatPaise(cancelledRefundPaise(row))}
                 </TableCell>
                 <TableCell>
-                  <RefundCustomerButton id={row.id} amount={row.refund_amount} />
+                  <Chip size="small" color={refundStatusInfo(row.refund_status).color} label={refundStatusInfo(row.refund_status).label} />
+                </TableCell>
+                <TableCell>
+                  {row.refund_status === "failed" ? (
+                    <RetryRefundButton id={row.id} amountPaise={cancelledRefundPaise(row)} />
+                  ) : null}
                 </TableCell>
               </TableRow>
           ))}
@@ -541,7 +542,7 @@ export default function DashboardShell(props: Props) {
           iconPosition="start"
           label={
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <span>Refund pending</span>
+              <span>Refunds in progress</span>
               {refundCount > 0 ? <Chip size="small" color="warning" label={refundCount} /> : null}
             </Stack>
           }
@@ -626,15 +627,15 @@ export default function DashboardShell(props: Props) {
               <Box>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <PaymentsOutlinedIcon color="primary" fontSize="small" />
-                  <Typography variant="h2">Refund pending</Typography>
+                  <Typography variant="h2">Refunds in progress</Typography>
                 </Stack>
                 <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
-                  Paid cancellations: keep 10%, refund 90% to the customer via Razorpay.
+                  Paid cancellations before pickup are refunded in full, automatically. Only a failed refund needs you.
                 </Typography>
               </Box>
-              <Chip variant="outlined" color="warning" label={`${refundCount} pending`} />
+              <Chip variant="outlined" color="warning" label={`${refundCount} open`} />
             </Stack>
-            <RefundPendingTable rows={refundPendingOrders} emptyMessage="No refunds waiting." />
+            <RefundPendingTable rows={refundPendingOrders} emptyMessage="No refunds in progress." />
           </CardContent>
         </Card>
       )}

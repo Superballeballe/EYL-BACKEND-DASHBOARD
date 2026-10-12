@@ -48,9 +48,24 @@ export function refundStatusInfo(status: string | null | undefined): { label: st
       return { label: "Refunded", color: "success" };
     case "failed":
       return { label: "Failed · needs ops", color: "error" };
+    case "dry_run":
+      return { label: "Dry run · not sent", color: "warning" };
+    case "skipped":
+      return { label: "Skipped · mode off", color: "default" };
     default:
       return { label: String(status), color: "default" };
   }
+}
+
+/** What a cancelled_orders row refunds, in paise (exact column first, rupees as fallback). */
+export function cancelledRefundPaise(row: {
+  refund_amount_paise?: number | null;
+  refund_amount?: number | null;
+}): number | null {
+  const exact = row.refund_amount_paise;
+  if (exact !== null && exact !== undefined && Number.isFinite(Number(exact))) return Number(exact);
+  if (row.refund_amount === null || row.refund_amount === undefined) return null;
+  return rupeesToPaise(row.refund_amount);
 }
 
 /** payment_refunds.status → label + colour. */
