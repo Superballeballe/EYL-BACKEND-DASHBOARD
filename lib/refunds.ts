@@ -236,25 +236,200 @@ export type AutoRefundMode = "live" | "dry_run" | "off";
 export const AUTO_REFUND_MODES: { value: AutoRefundMode; label: string; description: string }[] = [
   {
     value: "live",
-    label: "Live",
+    label: "Live (normal)",
     description:
-      "Lost payments found by the reconcile job are recorded and, if rule A or B applies, refunded through Razorpay.",
+      "The normal state. Lost payments found by the reconcile job are recorded and, when rule A or B applies, refunded through Razorpay.",
   },
   {
     value: "dry_run",
-    label: "Dry run",
+    label: "Dry run (temporary)",
     description:
-      "The reconcile job only records what it WOULD refund (the dry-run list below). Razorpay is never called.",
+      "Temporary safety switch. The reconcile job only records what it WOULD refund (the dry-run list). Razorpay is never called for those.",
   },
   {
     value: "off",
-    label: "Off",
-    description: "The reconcile job records nothing it would refund and calls nothing (rows show as skipped).",
+    label: "Off (temporary)",
+    description:
+      "Temporary safety switch. The reconcile job refunds nothing and calls nothing; those payments show as skipped.",
   },
 ];
 
 export const AUTO_REFUND_MODE_SCOPE =
-  "This switch gates only the reconcile job for lost payments. Rule A (not confirmed within 30 min), rule B (paid after cancel) and cancellations refund in every mode. Payment reviews are never automatic.";
+  "This switch gates only refunds the reconcile job would trigger for lost payments. Rule A (not confirmed within 30 min), rule B (paid after cancel) and cancellations before pickup refund in every mode. Payment reviews are never automatic.";
+
+/** The mode in force: a missing or unknown app_settings value means live (the default). */
+export function effectiveAutoRefundMode(value: string | null | undefined): AutoRefundMode {
+  return isAutoRefundMode(value) ? value : "live";
+}
+
+/** Show the dry-run list only while it matters: in dry_run, or while dry_run rows exist. */
+export function showDryRunList(mode: AutoRefundMode, dryRunRows: number): boolean {
+  return mode === "dry_run" || dryRunRows > 0;
+}
+
+export const MODE_REASON_MIN = 5;
+
+export function modeReasonError(reason: string | null | undefined): string | null {
+  const r = (reason ?? "").trim();
+  if (r.length < MODE_REASON_MIN) return `Say why (at least ${MODE_REASON_MIN} characters).`;
+  if (r.length > 400) return "Keep the reason under 400 characters.";
+  return null;
+}
+
+/**
+ * ops_set_auto_refund_mode records the service role as actor, so the note
+ * carries the signed-in user: "<email>: <reason>" (≤ 500 chars).
+ */
+export function modeChangeNote(actor: string, reason: string): string {
+  return `${actor}: ${reason.trim()}`.slice(0, 500);
+}
+
+/** refund_audit_log rows for set_auto_refund_mode → history entries. */
+export type ModeHistoryEntry = { at: string; from: string | null; to: string | null; note: string | null; actor: string };
+
+export function modeHistoryFromAudit(
+  rows: { created_at: string; actor: string; result?: string | null; detail: unknown }[],
+): ModeHistoryEntry[] {
+  return rows
+    .filter((r) => r.result !== "error")
+    .map((r) => {
+      const d = (r.detail && typeof r.detail === "object" ? r.detail : {}) as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+      return { at: r.created_at, from: str(d.from), to: str(d.mode), note: str(d.note), actor: r.actor };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Unified refunds list (cancelled_orders + payment_refunds)
+// ---------------------------------------------------------------------------
+
+export type RefundListRow = {
+  key: string;
+  order_id: string | null;
+  order_code: string | null;
+  cancelled_id: string | null;
+  payment_id: string | null;
+  status: string;
+  origin: string;
+  reason: string | null;
+  amount_paise: number | null;
+  refund_ref: string | null;
+  last_error: string | null;
+  at: string;
+};
+
+type CancelledForList = {
+  id: string;
+  order_id: string | null;
+  order_code: string | null;
+  reason_code?: string | null;
+  reason_label?: string | null;
+  reason_note?: string | null;
+  was_confirmed?: boolean | null;
+  refund_status: string;
+  refund_amount?: number | null;
+  refund_amount_paise?: number | null;
+  refund_ref?: string | null;
+  refund_last_error?: string | null;
+  payment_ref?: string | null;
+  cancelled_at: string;
+};
+
+type LedgerForList = {
+  razorpay_payment_id: string;
+  order_id: string | null;
+  cancelled_order_id: string | null;
+  origin: string;
+  status: string;
+  amount_paise: number | null;
+  note: string | null;
+  created_at: string;
+};
+
+/**
+ * One list for ops: every cancellation refund (status from cancelled_orders,
+ * origin from the ledger when it has the row) plus the reconcile job's
+ * dry_run / skipped "would refund" rows, newest first. Review refunds live
+ * in the Needs review history instead.
+ */
+export function buildRefundRows(
+  cancelled: CancelledForList[],
+  ledger: LedgerForList[],
+  orderCodes: Record<string, string | null> = {},
+): RefundListRow[] {
+  const ledgerByCancelled = new Map<string, LedgerForList>();
+  for (const l of ledger) if (l.cancelled_order_id) ledgerByCancelled.set(l.cancelled_order_id, l);
+
+  const rows: RefundListRow[] = cancelled
+    .filter((c) => c.refund_status && c.refund_status !== "none")
+    .map((c) => {
+      const l = ledgerByCancelled.get(c.id);
+      return {
+        key: `c:${c.id}`,
+        order_id: c.order_id,
+        order_code: c.order_code,
+        cancelled_id: c.id,
+        payment_id: c.payment_ref ?? l?.razorpay_payment_id ?? null,
+        status: c.refund_status,
+        origin: l?.origin ?? originOfCancellation(c),
+        reason: c.reason_label ?? null,
+        amount_paise: cancelledRefundPaise(c),
+        refund_ref: c.refund_ref ?? null,
+        last_error: c.refund_status === "failed" ? (c.refund_last_error ?? null) : null,
+        at: c.cancelled_at,
+      };
+    });
+
+  for (const l of ledger) {
+    if (l.status !== "dry_run" && l.status !== "skipped") continue;
+    rows.push({
+      key: `p:${l.razorpay_payment_id}`,
+      order_id: l.order_id,
+      order_code: l.order_id ? (orderCodes[l.order_id] ?? null) : null,
+      cancelled_id: null,
+      payment_id: l.razorpay_payment_id,
+      status: l.status,
+      origin: l.origin,
+      reason: l.note,
+      amount_paise: l.amount_paise,
+      refund_ref: null,
+      last_error: null,
+      at: l.created_at,
+    });
+  }
+
+  return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+}
+
+// ---------------------------------------------------------------------------
+// Manual refund (order page)
+// ---------------------------------------------------------------------------
+
+const PICKED_UP = ["picked_up", "in_transit", "delivered", "completed"];
+
+/**
+ * The manual refund button exists only where nothing automatic will happen:
+ * a failed cancellation refund (retry), a paid order after pickup, or a paid
+ * cancelled order whose refund was never queued.
+ * Everything else is refunded automatically.
+ */
+export function manualRefundAction(input: {
+  orderStatus: string | null | undefined;
+  paymentStatus: string | null | undefined;
+  refundStatus: string | null | undefined;
+}): "retry" | "refund_after_pickup" | "start_refund" | null {
+  if (input.refundStatus === "failed") return "retry";
+  if (input.refundStatus === "refunded" || input.refundStatus === "pending" || input.refundStatus === "processing") {
+    return null;
+  }
+  const paid = String(input.paymentStatus ?? "").toLowerCase() === "paid";
+  const status = String(input.orderStatus ?? "").toLowerCase();
+  if (paid && PICKED_UP.includes(status)) return "refund_after_pickup";
+  // A paid cancelled order with no refund queued: the queue step was missed
+  // (e.g. the dashboard cancel's refund call failed). Let ops start it.
+  if (paid && (status === "cancelled" || status === "canceled")) return "start_refund";
+  return null;
+}
 
 export function isAutoRefundMode(v: unknown): v is AutoRefundMode {
   return v === "live" || v === "dry_run" || v === "off";

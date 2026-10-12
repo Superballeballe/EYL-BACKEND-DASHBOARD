@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ageLabel,
+  buildRefundRows,
+  effectiveAutoRefundMode,
+  manualRefundAction,
+  modeChangeNote,
+  modeHistoryFromAudit,
+  modeReasonError,
+  showDryRunList,
   cancelConfirmMessage,
   cancelledRefundPaise,
   friendlyOpsCancelError,
@@ -165,5 +172,70 @@ describe("ops cancel errors", () => {
     const raw = friendlyOpsCancelError(null, 'relation "x" does not exist');
     assert.equal(raw.status, 500);
     assert.doesNotMatch(raw.message, /relation/);
+  });
+});
+
+describe("AUTO_REFUND_MODE", () => {
+  it("treats a missing or unknown value as live", () => {
+    assert.equal(effectiveAutoRefundMode(null), "live");
+    assert.equal(effectiveAutoRefundMode("bogus"), "live");
+    assert.equal(effectiveAutoRefundMode("dry_run"), "dry_run");
+  });
+
+  it("shows the dry-run list only in dry_run or while rows exist", () => {
+    assert.equal(showDryRunList("live", 0), false);
+    assert.equal(showDryRunList("live", 2), true);
+    assert.equal(showDryRunList("dry_run", 0), true);
+  });
+
+  it("requires a reason and records the user in the note", () => {
+    assert.ok(modeReasonError("ok"));
+    assert.equal(modeReasonError("Razorpay outage"), null);
+    assert.equal(modeChangeNote("a@b.c", " outage "), "a@b.c: outage");
+  });
+
+  it("reads history from the audit log", () => {
+    const h = modeHistoryFromAudit([
+      { created_at: "t2", actor: "service", result: "ok", detail: { from: "live", mode: "off", note: "a@b.c: x" } },
+      { created_at: "t1", actor: "service", result: "error", detail: {} },
+    ]);
+    assert.deepEqual(h, [{ at: "t2", from: "live", to: "off", note: "a@b.c: x", actor: "service" }]);
+  });
+});
+
+describe("refund list", () => {
+  it("merges cancellation refunds and dry-run rows, newest first", () => {
+    const rows = buildRefundRows(
+      [
+        { id: "c1", order_id: "o1", order_code: "EYL1", refund_status: "failed", refund_amount_paise: 30000,
+          refund_last_error: "balance", cancelled_at: "2026-10-12T10:00:00Z", was_confirmed: true },
+        { id: "c2", order_id: "o2", order_code: "EYL2", refund_status: "none", cancelled_at: "2026-10-12T11:00:00Z" },
+      ],
+      [
+        { razorpay_payment_id: "pay_1", order_id: "o1", cancelled_order_id: "c1", origin: "confirmed_cancel",
+          status: "claimed", amount_paise: 30000, note: null, created_at: "2026-10-12T10:00:00Z" },
+        { razorpay_payment_id: "pay_9", order_id: "o9", cancelled_order_id: null, origin: "reconcile",
+          status: "dry_run", amount_paise: 5000, note: "would refund", created_at: "2026-10-12T12:00:00Z" },
+      ],
+      { o9: "EYL9" },
+    );
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].status, "dry_run");
+    assert.equal(rows[0].order_code, "EYL9");
+    assert.equal(rows[1].payment_id, "pay_1");
+    assert.equal(rows[1].origin, "confirmed_cancel");
+    assert.equal(rows[1].last_error, "balance");
+  });
+});
+
+describe("manual refund button", () => {
+  it("only for failed refunds, picked-up orders and missed queues", () => {
+    assert.equal(manualRefundAction({ orderStatus: "cancelled", paymentStatus: "paid", refundStatus: "failed" }), "retry");
+    assert.equal(manualRefundAction({ orderStatus: "delivered", paymentStatus: "paid", refundStatus: null }), "refund_after_pickup");
+    assert.equal(manualRefundAction({ orderStatus: "cancelled", paymentStatus: "paid", refundStatus: "pending" }), null);
+    assert.equal(manualRefundAction({ orderStatus: "cancelled", paymentStatus: "paid", refundStatus: "refunded" }), null);
+    assert.equal(manualRefundAction({ orderStatus: "accepted", paymentStatus: "paid", refundStatus: null }), null);
+    assert.equal(manualRefundAction({ orderStatus: "delivered", paymentStatus: "pending", refundStatus: null }), null);
+    assert.equal(manualRefundAction({ orderStatus: "cancelled", paymentStatus: "paid", refundStatus: "none" }), "start_refund");
   });
 });
