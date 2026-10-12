@@ -72,9 +72,10 @@ async function loadLinkedDelivery(db: ReturnType<typeof supabaseAdmin>, id: stri
 }
 
 /**
- * Ops cancel of an app order. The database cancels it and refunds a paid
- * order 100% before pickup (no fee); the dashboard only mirrors the result
- * on its own deliveries row.
+ * Ops cancel of an app order via ops_cancel_order: the database cancels it
+ * (order + deliveries row) and refunds a paid order 100% before pickup, no
+ * fee. The deliveries update below is the same write, kept so the row this
+ * request loaded is returned fresh even if it was matched by id only.
  */
 async function cancelAppOrderFromDashboard(
   db: ReturnType<typeof supabaseAdmin>,
@@ -108,7 +109,9 @@ async function cancelAppOrderFromDashboard(
     ok: true as const,
     delivery: updatedDelivery,
     app_order: updatedOrder,
-    refund_message: result.refund_message ?? null,
+    already_cancelled: result.already_cancelled,
+    refund_status: result.refund_status,
+    refund_amount_paise: result.refund_amount_paise,
   };
 }
 
@@ -396,7 +399,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
       const cancelled = await cancelAppOrderFromDashboard(db, linkedDelivery, actor);
       if (!cancelled.ok) {
         if (cancelled.status === 404) return notFound(cancelled.message);
-        if (cancelled.status === 500) return ok({ error: cancelled.message }, { status: 500 });
+        if (cancelled.status >= 500) return ok({ error: cancelled.message }, { status: cancelled.status });
         return badRequest(cancelled.message);
       }
       return ok(cancelled);

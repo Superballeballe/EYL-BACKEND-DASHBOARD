@@ -57,6 +57,8 @@ describe("refund status", () => {
     assert.equal(originOfCancellation({ reason_label: "Paid after cancellation" }), "rule_b_paid_after_cancel");
     assert.equal(originOfCancellation({ reason_code: "not_confirmed" }), "rule_a_not_confirmed");
     assert.equal(originOfCancellation({ reason_code: "changed_plans" }), "customer_cancel");
+    assert.equal(originOfCancellation({ reason_code: "ops_cancelled", was_confirmed: true }), "ops_cancel");
+    assert.equal(originOfCancellation({ reason_code: "not_confirmed", was_confirmed: true }), "rule_a_not_confirmed");
   });
 });
 

@@ -292,8 +292,7 @@ export default function DeliveryLifecycleActions({
         return;
       }
 
-      const data = (await res.json().catch(() => ({}))) as LifecycleResult & { refund_message?: string | null };
-      if (data.refund_message) window.alert(data.refund_message);
+      const data = (await res.json().catch(() => ({}))) as LifecycleResult;
       onUpdated?.(data);
       setAssignOpen(false);
       router.refresh();

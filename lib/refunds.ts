@@ -88,6 +88,7 @@ const ORIGIN_LABELS: Record<string, string> = {
   customer_cancel: "Customer cancelled",
   confirmed_cancel: "Confirmed order cancelled",
   ops: "Ops",
+  ops_cancel: "Cancelled by ops",
   review_manual: "Payment review (ops)",
   reconcile: "Lost payment (reconcile)",
 };
@@ -100,7 +101,7 @@ export function refundOriginLabel(origin: string | null | undefined): string {
 
 /**
  * Same rule as public.refund_origin_of, for rows the ledger has not seen
- * (e.g. before the 20261012150000 migration is applied).
+ * (e.g. before the 20261012150000 migration is applied). Mirrors 20261012190000.
  */
 export function originOfCancellation(row: {
   reason_code?: string | null;
@@ -109,11 +110,12 @@ export function originOfCancellation(row: {
   was_confirmed?: boolean | null;
 }): string {
   if ((row.reason_note ?? "").startsWith("ops:")) return "ops";
-  if (row.was_confirmed) return "confirmed_cancel";
+  if (row.reason_code === "ops_cancelled") return "ops_cancel";
   if (row.reason_label === "Paid after cancellation" || row.reason_label === "Paid after the payment window closed") {
     return "rule_b_paid_after_cancel";
   }
   if (row.reason_code === "not_confirmed") return "rule_a_not_confirmed";
+  if (row.was_confirmed) return "confirmed_cancel";
   return "customer_cancel";
 }
 

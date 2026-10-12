@@ -268,6 +268,8 @@ export type CancelledOrder = {
   refund_queued_at?: string | null;
   refund_resolution_note?: string | null;
   refund_resolved_by?: string | null;
+  /** Who cancelled (ops_cancel_order, 20261012190000). */
+  cancelled_by?: string | null;
   /** Razorpay payment the refund is for (20261012150000). */
   payment_ref?: string | null;
 };
