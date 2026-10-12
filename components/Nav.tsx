@@ -47,7 +47,7 @@ const LINKS = [
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
   { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
-  { href: "/hub-contacts", label: "Hub contacts", Icon: PhoneInTalkOutlinedIcon },
+  { href: "/hub-contacts", label: "Customer care", Icon: PhoneInTalkOutlinedIcon },
   { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
 ] as const;
 

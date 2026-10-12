@@ -1,5 +1,7 @@
+import { NextResponse } from "next/server";
 import { badRequest } from "@/lib/api";
 import { HUB_CONTACTS_MAX_ACTIVE } from "@/lib/schemas";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const HUB_CONTACT_COLUMNS = "id, label, description, phone, sort_order, active, updated_at";
 
@@ -19,4 +21,24 @@ export function hubContactWriteError(error: { code?: string; message?: string })
     return badRequest("Label must be 1–40 characters");
   }
   return badRequest(message);
+}
+
+/**
+ * The app shows one contact ("Urgent, connect with us"): the first active row.
+ * Keep it to a single active row so what ops see here is what customers see.
+ * Called after `keepId` was saved as active; the save happens first so a
+ * failed save never leaves the app with no active contact.
+ */
+export async function deactivateOtherContacts(keepId: string) {
+  const { error } = await supabaseAdmin()
+    .from("hub_contacts")
+    .update({ active: false })
+    .eq("active", true)
+    .neq("id", keepId);
+  if (!error) return null;
+  console.error("hub_contacts: could not hide the other active contacts", error);
+  return NextResponse.json(
+    { error: "Saved, but the other contacts are still active. Refresh the page and turn them off." },
+    { status: 500 },
+  );
 }

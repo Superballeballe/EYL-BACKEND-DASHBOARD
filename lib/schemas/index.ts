@@ -326,7 +326,8 @@ export const monthlyCouponSchema = monthlyCouponBaseSchema.superRefine(percentMa
 export const monthlyCouponUpdateSchema = monthlyCouponBaseSchema.partial().superRefine(percentMaxRefine);
 export type MonthlyCouponInput = z.infer<typeof monthlyCouponSchema>;
 
-// ---- hub contacts ("Call the Hub" in the app) -------------------------------
+// ---- hub contacts ("Urgent, connect with us" in the app) --------------------
+// The app shows only the first active row; the API keeps a single active row.
 // Limits mirror the hub_contacts table checks (EYL-APP 20261008130000_hub_contacts.sql).
 export const HUB_CONTACTS_MAX_ACTIVE = 10;
 

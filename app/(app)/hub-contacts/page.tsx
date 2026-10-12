@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 
 export const dynamic = "force-dynamic";
 
-const SUBTITLE = "Numbers behind “Call the Hub” in the EYL mobile app";
+const SUBTITLE = "The one number behind “Urgent, connect with us” (Call and WhatsApp) in the EYL mobile app";
 
 export default async function HubContactsPage() {
   const { data, error } = await supabaseAdmin()
@@ -18,7 +18,7 @@ export default async function HubContactsPage() {
   if (error) {
     return (
       <div>
-        <PageHeader title="Hub contacts" subtitle={SUBTITLE} />
+        <PageHeader title="Customer care contact" subtitle={SUBTITLE} />
         <Typography color="error" sx={{ p: 2 }}>
           Failed to load: {error.message}
         </Typography>
@@ -28,7 +28,7 @@ export default async function HubContactsPage() {
 
   return (
     <div>
-      <PageHeader title="Hub contacts" subtitle={SUBTITLE} />
+      <PageHeader title="Customer care contact" subtitle={SUBTITLE} />
       <HubContactsBoard contacts={(data ?? []) as HubContact[]} />
     </div>
   );
