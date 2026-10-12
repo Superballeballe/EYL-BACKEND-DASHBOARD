@@ -10,6 +10,7 @@ import {
   confirmBlockedReason,
   friendlyOrderUpdateError,
   isOrderGuardError,
+  statusOnlyRetryAllowed,
   type AppInvoiceGuardInput,
 } from "@/lib/appOrderLifecycle";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
@@ -259,6 +260,7 @@ async function updateLinkedOrder(db: ReturnType<typeof supabaseAdmin>, orderId: 
   // A pay-first guard said no (not paid / window closed). Retrying with only
   // the status would move the order on without confirming it.
   if (isOrderGuardError(result.error)) return result;
+  if (!statusOnlyRetryAllowed(desiredPatch)) return result;
 
   let fallbackPatch = stripNewOrderColumns(desiredPatch);
   if (Object.keys(fallbackPatch).length === 0) return result;

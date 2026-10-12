@@ -8,6 +8,7 @@ import {
   friendlyOrderUpdateError,
   isInvoicePaidOrFree,
   isOrderGuardError,
+  statusOnlyRetryAllowed,
   timeLeftLabel,
 } from "./appOrderLifecycle";
 
@@ -94,6 +95,19 @@ describe("DB errors", () => {
     assert.equal(friendlyOrderUpdateError(closed, "confirm"), APP_ORDER_MESSAGES.confirmWindowClosed);
     assert.equal(friendlyOrderUpdateError(closed, "assign"), APP_ORDER_MESSAGES.assignWindowClosed);
     assert.equal(friendlyOrderUpdateError({ message: "boom" }, "confirm"), APP_ORDER_MESSAGES.saveFailed);
+  });
+});
+
+describe("status-only retry after a failed order update", () => {
+  it("never for a confirm: the order would be accepted but not confirmed, and never refunded", () => {
+    assert.equal(statusOnlyRetryAllowed({ confirmed_at: "2026-10-12T12:00:00Z", accepted_at: "x", status: "accepted" }), false);
+  });
+  it("never when a knight is assigned", () => {
+    assert.equal(statusOnlyRetryAllowed({ status: "rider_assigned", assigned_knight_id: "k1", rider_name: "K" }), false);
+  });
+  it("still for plain status moves (pickup, deliver, manual rider name)", () => {
+    assert.equal(statusOnlyRetryAllowed({ status: "picked_up" }), true);
+    assert.equal(statusOnlyRetryAllowed({ status: "rider_assigned", rider_name: "Walk-in", accepted_at: "x" }), true);
   });
 });
 

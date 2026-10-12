@@ -122,6 +122,17 @@ export function assignBlockedReason(
 }
 
 /** True for errors raised by the pay-first DB guards (never retry these with a smaller patch). */
+/**
+ * Whether a failed order update may be retried with only its status (for
+ * databases without the newer order columns). Never when the patch confirms
+ * the order or assigns a knight: the status would move on without the
+ * confirmation or the knight, and the automatic expiry / refund only looks at
+ * placed orders, so a paid order would be stuck with nobody refunding it.
+ */
+export function statusOnlyRetryAllowed(patch: Record<string, unknown>): boolean {
+  return !("confirmed_at" in patch) && !("assigned_knight_id" in patch);
+}
+
 export function isOrderGuardError(error: { code?: string | null; message?: string | null } | null | undefined) {
   if (!error) return false;
   return error.code === "P0001" || /not allowed:/i.test(error.message ?? "");
