@@ -13,6 +13,9 @@ import {
   type AppInvoiceGuardInput,
 } from "@/lib/appOrderLifecycle";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
+import { opsCancelAppOrder } from "@/lib/server/opsCancel";
+import { opsActor } from "@/lib/server/opsRefund";
+import { getSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -68,109 +71,21 @@ async function loadLinkedDelivery(db: ReturnType<typeof supabaseAdmin>, id: stri
   return (byOrder as DeliveryLink | null) ?? null;
 }
 
+/**
+ * Ops cancel of an app order. The database cancels it and refunds a paid
+ * order 100% before pickup (no fee); the dashboard only mirrors the result
+ * on its own deliveries row.
+ */
 async function cancelAppOrderFromDashboard(
   db: ReturnType<typeof supabaseAdmin>,
   delivery: DeliveryLink,
+  actor: string,
 ) {
   const orderId = delivery.app_order_id;
   if (!orderId) throw new Error("Linked app order is missing");
 
-  const { data: order, error: orderError } = await db
-    .from("orders")
-    .select(
-      "id, order_code, user_id, status, confirmed_at, assigned_knight_id, pending_knight_id, assigned_at, rider_assigned_at, pickup_address, delivery_address",
-    )
-    .eq("id", orderId)
-    .maybeSingle();
-  if (orderError) throw new Error(orderError.message);
-  if (!order) throw new Error("Linked app order not found");
-  if (isAppOrderCancelled(order)) throw new Error("This app order was already cancelled.");
-
-  const status = String(order.status ?? "").toLowerCase();
-  if (["picked_up", "in_transit", "delivered"].includes(status)) {
-    throw new Error("Cannot cancel after pickup — contact support.");
-  }
-
-  const { data: invoice, error: invoiceError } = await db
-    .from("invoices")
-    .select("payment_status, total_amount, metadata")
-    .eq("order_id", orderId)
-    .maybeSingle();
-  if (invoiceError) throw new Error(invoiceError.message);
-
-  const paid = String(invoice?.payment_status ?? "").toLowerCase() === "paid";
-  const total = Math.round(Number(invoice?.total_amount ?? 0));
-  const fee = paid ? Math.round(total * 0.1) : 0;
-  const refund = paid ? Math.max(total - fee, 0) : 0;
-  const refundStatus = paid && refund > 0 ? "pending" : "none";
-  const wasConfirmed = Boolean(
-    order.confirmed_at ||
-      order.assigned_knight_id ||
-      order.pending_knight_id ||
-      order.assigned_at ||
-      order.rider_assigned_at ||
-      ["confirmed", "accepted", "assigned", "rider_assigned"].includes(status),
-  );
-
-  const { data: existingCancelled } = await db
-    .from("cancelled_orders")
-    .select("id")
-    .eq("order_id", orderId)
-    .maybeSingle();
-
-  if (!existingCancelled) {
-    const { error: insertError } = await db.from("cancelled_orders").insert({
-      order_id: orderId,
-      order_code: order.order_code,
-      user_id: order.user_id,
-      reason_code: "other",
-      reason_label: "Cancelled from dashboard",
-      reason_note: "Cancelled by operations team",
-      was_confirmed: wasConfirmed,
-      payment_status: invoice?.payment_status ?? null,
-      total_amount: total,
-      cancellation_fee: fee,
-      refund_amount: refund,
-      refund_status: refundStatus,
-      pickup_address: order.pickup_address,
-      delivery_address: order.delivery_address,
-    });
-    if (insertError) throw new Error(insertError.message);
-  }
-
-  const { error: orderUpdateError } = await db
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId);
-  if (orderUpdateError) throw new Error(orderUpdateError.message);
-
-  if (order.assigned_knight_id) {
-    const { data: profile } = await db
-      .from("profiles")
-      .select("orders_today")
-      .eq("id", order.assigned_knight_id)
-      .maybeSingle();
-    if (profile && (profile.orders_today ?? 0) > 0) {
-      await db
-        .from("profiles")
-        .update({ orders_today: Math.max(0, (profile.orders_today ?? 0) - 1) })
-        .eq("id", order.assigned_knight_id);
-    }
-  }
-
-  if (paid && invoice) {
-    const meta = {
-      ...((invoice.metadata as Record<string, unknown> | null) ?? {}),
-      refund_status: refundStatus,
-      refund_amount: refund,
-      cancellation_fee: fee,
-      cancellation_fee_percent: 10,
-      cancel_reason_code: "other",
-      cancel_reason: "Cancelled from dashboard",
-      cancelled_at: nowIso(),
-    };
-    await db.from("invoices").update({ metadata: meta }).eq("order_id", orderId);
-  }
+  const result = await opsCancelAppOrder(orderId, "Cancelled from dashboard", actor);
+  if (!result.ok) return result;
 
   const { data: updatedDelivery, error: deliveryError } = await db
     .from("deliveries")
@@ -189,7 +104,12 @@ async function cancelAppOrderFromDashboard(
     .eq("id", orderId)
     .maybeSingle();
 
-  return { delivery: updatedDelivery, app_order: updatedOrder };
+  return {
+    ok: true as const,
+    delivery: updatedDelivery,
+    app_order: updatedOrder,
+    refund_message: result.refund_message ?? null,
+  };
 }
 
 function nowIso() {
@@ -471,15 +391,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
     }
 
     if (action.action === "cancel" && linkedDelivery.app_order_id) {
-      try {
-        const cancelled = await cancelAppOrderFromDashboard(db, linkedDelivery);
-        return ok({ ok: true, ...cancelled });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Could not cancel order";
-        if (/already cancelled/i.test(message)) return badRequest(message);
-        if (/not found/i.test(message)) return notFound(message);
-        return serverError(error);
+      const user = await getSessionUser();
+      const actor = user ? opsActor(user) : "dashboard-api-key";
+      const cancelled = await cancelAppOrderFromDashboard(db, linkedDelivery, actor);
+      if (!cancelled.ok) {
+        if (cancelled.status === 404) return notFound(cancelled.message);
+        if (cancelled.status === 500) return ok({ error: cancelled.message }, { status: 500 });
+        return badRequest(cancelled.message);
       }
+      return ok(cancelled);
     }
 
     // Confirm writes the order first: if the DB guard refuses, the delivery

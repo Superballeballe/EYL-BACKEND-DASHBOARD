@@ -19,6 +19,7 @@ import {
 import ScheduleDateTimeField from "@/components/ScheduleDateTimeField";
 import { APP_ORDER_MESSAGES, appOrderStage, timeLeftLabel } from "@/lib/appOrderLifecycle";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
+import { cancelConfirmMessage, planOpsCancel } from "@/lib/refunds";
 import {
   isScheduleInputBefore,
   isScheduleInputBeforeNow,
@@ -291,7 +292,8 @@ export default function DeliveryLifecycleActions({
         return;
       }
 
-      const data = (await res.json().catch(() => ({}))) as LifecycleResult;
+      const data = (await res.json().catch(() => ({}))) as LifecycleResult & { refund_message?: string | null };
+      if (data.refund_message) window.alert(data.refund_message);
       onUpdated?.(data);
       setAssignOpen(false);
       router.refresh();
@@ -343,7 +345,18 @@ export default function DeliveryLifecycleActions({
   }
 
   function handleCancel() {
-    if (!window.confirm("Cancel this order? The customer will no longer see it in the app.")) return;
+    const appOrder = delivery.app_order;
+    let message = "Cancel this delivery?";
+    if (appOrder) {
+      const inv = Array.isArray(appOrder.invoices) ? appOrder.invoices[0] : appOrder.invoices;
+      const plan = planOpsCancel(appOrder, inv ?? null);
+      if (!plan.ok) {
+        setError(plan.reason);
+        return;
+      }
+      message = cancelConfirmMessage(plan);
+    }
+    if (!window.confirm(message)) return;
     run({ action: "cancel" });
   }
 

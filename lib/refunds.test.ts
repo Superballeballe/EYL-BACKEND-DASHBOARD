@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   ageLabel,
   cancelConfirmMessage,
+  cancelledRefundPaise,
+  friendlyOpsCancelError,
   formatPaise,
   isAutoRefundMode,
   isLeaseActive,
@@ -128,5 +130,40 @@ describe("ops-refund errors", () => {
   it("validates modes", () => {
     assert.equal(isAutoRefundMode("dry_run"), true);
     assert.equal(isAutoRefundMode("LIVE"), false);
+  });
+});
+
+describe("cancelled refund amount", () => {
+  it("prefers the paise column and falls back to rupees", () => {
+    assert.equal(cancelledRefundPaise({ refund_amount_paise: 44950, refund_amount: 450 }), 44950);
+    assert.equal(cancelledRefundPaise({ refund_amount: 300 }), 30000);
+    assert.equal(cancelledRefundPaise({}), null);
+  });
+
+  it("labels ledger-only statuses", () => {
+    assert.equal(refundStatusInfo("dry_run").label, "Dry run · not sent");
+    assert.equal(refundStatusInfo("skipped").label, "Skipped · mode off");
+  });
+});
+
+describe("ops cancel errors", () => {
+  it("keeps the after-pickup copy", () => {
+    assert.deepEqual(friendlyOpsCancelError("after_pickup", "x"), {
+      status: 409,
+      message: "Can't cancel after pickup — contact support.",
+    });
+    assert.equal(friendlyOpsCancelError(null, "Order has been picked up").status, 409);
+  });
+
+  it("maps already cancelled and not found", () => {
+    assert.equal(friendlyOpsCancelError("already_cancelled", null).status, 409);
+    assert.equal(friendlyOpsCancelError("not_found", null).status, 404);
+  });
+
+  it("shows an ops message for a known code but hides raw DB errors", () => {
+    assert.deepEqual(friendlyOpsCancelError("forbidden", "Only ops can cancel."), { status: 400, message: "Only ops can cancel." });
+    const raw = friendlyOpsCancelError(null, 'relation "x" does not exist');
+    assert.equal(raw.status, 500);
+    assert.doesNotMatch(raw.message, /relation/);
   });
 });

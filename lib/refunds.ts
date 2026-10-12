@@ -214,7 +214,7 @@ export function planOpsCancel(
 ): OpsCancelPlan {
   const status = String(order.status ?? "").toLowerCase();
   if (status === "cancelled" || status === "canceled") return { ok: false, reason: "This app order was already cancelled." };
-  if (AFTER_PICKUP_STATUSES.includes(status)) return { ok: false, reason: "Cannot cancel after pickup — contact support." };
+  if (AFTER_PICKUP_STATUSES.includes(status)) return { ok: false, reason: "Can't cancel after pickup — contact support." };
   const paid = String(invoice?.payment_status ?? "").toLowerCase() === "paid";
   const refundPaise = paid ? Math.max(rupeesToPaise(invoice?.total_amount), 0) : 0;
   return { ok: true, paid, confirmed: isOrderConfirmed(order), refundPaise };
@@ -293,4 +293,37 @@ export function readOpsRefundError(body: unknown, status: number): OpsRefundErro
       ? b.message.trim()
       : FALLBACK_MESSAGES[code] ?? FALLBACK_MESSAGES.internal;
   return { ok: false, code, message, status: status >= 400 ? status : 500 };
+}
+
+// ---------------------------------------------------------------------------
+// ops_cancel_order replies
+// ---------------------------------------------------------------------------
+
+export const OPS_CANCEL_MESSAGES = {
+  afterPickup: "Can't cancel after pickup — contact support.",
+  alreadyCancelled: "This app order was already cancelled.",
+  notFound: "Linked app order not found",
+  failed: "Couldn't cancel this order. Refresh and check its status before trying again.",
+} as const;
+
+/**
+ * Map an ops_cancel_order { ok:false, code, message } (or a raw DB error) to
+ * an HTTP status and copy fit for ops. Raw DB text is never shown.
+ */
+export function friendlyOpsCancelError(
+  code: string | null | undefined,
+  message: string | null | undefined,
+): { status: 400 | 404 | 409 | 500; message: string } {
+  const c = String(code ?? "").toLowerCase();
+  const m = String(message ?? "");
+  if (c === "after_pickup" || c === "picked_up" || /pick(ed)?[ _-]?up/i.test(m)) {
+    return { status: 409, message: OPS_CANCEL_MESSAGES.afterPickup };
+  }
+  if (c === "already_cancelled" || /already cancel/i.test(m)) {
+    return { status: 409, message: OPS_CANCEL_MESSAGES.alreadyCancelled };
+  }
+  if (c === "not_found" || /not found/i.test(m)) return { status: 404, message: OPS_CANCEL_MESSAGES.notFound };
+  // Codes from ops_* functions carry a message written for ops.
+  if (c && c !== "internal" && m.trim() && c !== "unknown") return { status: 400, message: m.trim() };
+  return { status: 500, message: OPS_CANCEL_MESSAGES.failed };
 }
