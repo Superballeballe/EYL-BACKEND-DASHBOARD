@@ -23,19 +23,39 @@ export default function OrderRefundButton({
   const [busy, setBusy] = useState(false);
 
   async function refund() {
-    const amount = amountRupees ? ` of ${money(amountRupees)}` : "";
-    const question =
-      kind === "refund_after_pickup"
-        ? `This order was picked up, so nothing is refunded automatically. Refund the payment${amount} in full to the customer via Razorpay now?`
-        : `This cancelled order has no refund queued. Refund the payment${amount} in full to the customer via Razorpay now?`;
-    if (!window.confirm(question)) return;
-    const note = window.prompt("Note for the audit log (why this refund):", "") ?? "";
+    let body: { note?: string; amount_paise?: number } = {};
+    if (kind === "refund_after_pickup") {
+      // Picked up: never automatic. Ops choose the amount (full by default) and say why.
+      const full = amountRupees ?? 0;
+      const raw = window.prompt(
+        `This order was picked up, so nothing is refunded automatically.\nAmount to refund in ₹ (full payment is ${money(full)}):`,
+        full ? String(full) : "",
+      );
+      if (raw === null) return;
+      const rupees = Number(raw.replace(/[₹,\s]/g, ""));
+      if (!Number.isFinite(rupees) || rupees <= 0 || (full > 0 && rupees > full)) {
+        window.alert(`Enter an amount above ₹0${full ? ` and up to ${money(full)}` : ""}.`);
+        return;
+      }
+      const note = (window.prompt("Why is this order being refunded? (required, for the audit log)", "") ?? "").trim();
+      if (note.length < 3) {
+        window.alert("A note is required for refunds after pickup.");
+        return;
+      }
+      if (!window.confirm(`Refund ${money(rupees)} to the customer via Razorpay now? This can only be done once per payment.`)) return;
+      body = { note, amount_paise: Math.round(rupees * 100) };
+    } else {
+      const amount = amountRupees ? ` of ${money(amountRupees)}` : "";
+      if (!window.confirm(`This cancelled order has no refund queued. Refund the payment${amount} in full to the customer via Razorpay now?`)) return;
+      const note = (window.prompt("Note for the audit log (why this refund):", "") ?? "").trim();
+      body = note ? { note } : {};
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/refunds/orders/${orderId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(note.trim() ? { note: note.trim() } : {}),
+        body: JSON.stringify(body),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {

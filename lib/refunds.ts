@@ -278,14 +278,6 @@ export function modeReasonError(reason: string | null | undefined): string | nul
   return null;
 }
 
-/**
- * ops_set_auto_refund_mode records the service role as actor, so the note
- * carries the signed-in user: "<email>: <reason>" (≤ 500 chars).
- */
-export function modeChangeNote(actor: string, reason: string): string {
-  return `${actor}: ${reason.trim()}`.slice(0, 500);
-}
-
 /** refund_audit_log rows for set_auto_refund_mode → history entries. */
 export type ModeHistoryEntry = { at: string; from: string | null; to: string | null; note: string | null; actor: string };
 

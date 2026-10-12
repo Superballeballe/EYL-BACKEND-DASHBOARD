@@ -5,7 +5,6 @@ import {
   buildRefundRows,
   effectiveAutoRefundMode,
   manualRefundAction,
-  modeChangeNote,
   modeHistoryFromAudit,
   modeReasonError,
   showDryRunList,
@@ -190,10 +189,9 @@ describe("AUTO_REFUND_MODE", () => {
     assert.equal(showDryRunList("dry_run", 0), true);
   });
 
-  it("requires a reason and records the user in the note", () => {
+  it("requires a reason", () => {
     assert.ok(modeReasonError("ok"));
     assert.equal(modeReasonError("Razorpay outage"), null);
-    assert.equal(modeChangeNote("a@b.c", " outage "), "a@b.c: outage");
   });
 
   it("reads history from the audit log", () => {

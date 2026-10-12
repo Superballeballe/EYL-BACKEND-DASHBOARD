@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type OpsRefundBody =
   | { action: "retry" | "trigger"; order_id: string; note?: string }
   | { action: "resolve"; order_id: string; note: string; reference?: string }
+  | { action: "manual"; order_id: string; note: string; amount_paise?: number }
   | {
       action: "review";
       review_id: string;

@@ -9,7 +9,10 @@ export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ orderId: string }> };
 
-const schema = z.object({ note: z.string().trim().max(500).optional() });
+const schema = z.object({
+  note: z.string().trim().max(500).optional(),
+  amount_paise: z.number().int().positive().optional(),
+});
 
 /**
  * Manual refund of one order, through ops-refund. Allowed only where nothing
@@ -28,7 +31,7 @@ export async function POST(req: Request, { params }: Ctx) {
   }
 
   const parsed = schema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return badRequest("Keep the note under 500 characters.");
+  if (!parsed.success) return badRequest("Keep the note under 500 characters and the amount above ₹0.");
   const { orderId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) return badRequest("That order id isn't valid.");
 
@@ -54,12 +57,25 @@ export async function POST(req: Request, { params }: Ctx) {
     return badRequest("This order is refunded automatically, or has nothing to refund. Refresh to see its status.");
   }
 
+  const note = parsed.data.note ?? "";
+  if (action === "refund_after_pickup" && note.length < 3) {
+    return badRequest("Add a note saying why this order is being refunded.");
+  }
+
+  // After pickup: ops-refund `manual` (full or partial, never automatic).
   const result = await invokeOpsRefund(
-    {
-      action: action === "retry" ? "retry" : "trigger",
-      order_id: orderId,
-      ...(parsed.data.note ? { note: parsed.data.note } : {}),
-    },
+    action === "refund_after_pickup"
+      ? {
+          action: "manual",
+          order_id: orderId,
+          note,
+          ...(parsed.data.amount_paise ? { amount_paise: parsed.data.amount_paise } : {}),
+        }
+      : {
+          action: action === "retry" ? "retry" : "trigger",
+          order_id: orderId,
+          ...(note ? { note } : {}),
+        },
     opsActor(user),
   );
   if (!result.ok) return ok({ error: result.message, code: result.code }, { status: result.status });

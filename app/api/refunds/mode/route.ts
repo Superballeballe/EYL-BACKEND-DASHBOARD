@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { badRequest, forbidden, ok, unauthorized } from "@/lib/api";
-import { modeChangeNote, modeReasonError } from "@/lib/refunds";
+import { modeReasonError } from "@/lib/refunds";
 import { opsActor } from "@/lib/server/opsRefund";
 import { requireAdmin } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -14,8 +14,7 @@ const schema = z.object({
 
 /**
  * Admin only: change AUTO_REFUND_MODE via ops_set_auto_refund_mode (audited
- * in refund_audit_log). The RPC records the service role as actor, so the
- * signed-in admin goes in the note.
+ * in refund_audit_log as service:<admin email> via p_actor).
  */
 export async function POST(req: Request) {
   let user;
@@ -35,7 +34,8 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin().rpc("ops_set_auto_refund_mode", {
     p_mode: parsed.data.mode,
-    p_note: modeChangeNote(opsActor(user), parsed.data.reason),
+    p_note: parsed.data.reason.trim(),
+    p_actor: opsActor(user),
   });
   if (error) {
     console.error("[refund-mode] rpc failed", error.code, error.message);
