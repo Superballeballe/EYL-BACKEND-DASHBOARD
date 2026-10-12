@@ -205,11 +205,15 @@ export type Delivery = {
     delivery_scheduled_at?: string | null;
     accepted_at?: string | null;
     rider_assigned_at?: string | null;
+    confirmed_at?: string | null;
+    pending_knight_id?: string | null;
+    payment_deadline_at?: string | null;
+    confirm_deadline_at?: string | null;
     pickup_instructions?: string | null;
     delivery_instructions?: string | null;
     invoices?:
-      | { payment_status?: string | null; metadata?: Record<string, unknown> | null }
-      | { payment_status?: string | null; metadata?: Record<string, unknown> | null }[]
+      | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }
+      | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }[]
       | null;
   } | null;
   created_at: string;

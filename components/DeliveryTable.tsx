@@ -492,7 +492,9 @@ function DeliveryPreview({
               {effectiveFulfillmentStatus(delivery) === "cancelled"
                 ? "This order was cancelled in the app — you cannot assign a knight."
                 : actionVariant === "pending"
-                  ? "Assign a knight to start this delivery."
+                  ? delivery.app_order_id
+                    ? "Once the customer has paid, confirm the order, then assign a knight."
+                    : "Assign a knight to start this delivery."
                   : delivery.fulfillment_status === "active"
                     ? "Mark done when delivered, or edit details."
                     : "Mark pickup when collected, or edit details."}

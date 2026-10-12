@@ -592,7 +592,7 @@ export default function DashboardShell(props: Props) {
               <>
                 <OrdersPanel
                   title="New jobs to approve"
-                  subtitle="Assign knight and confirm pickup time"
+                  subtitle="Confirm paid app orders, then assign a knight"
                   icon={<AssignmentIcon color="primary" fontSize="small" />}
                   count={pendingCount}
                   countLabel="pending"

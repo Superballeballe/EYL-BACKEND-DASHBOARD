@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import ScheduleDateTimeField from "@/components/ScheduleDateTimeField";
+import { APP_ORDER_MESSAGES, appOrderStage, timeLeftLabel } from "@/lib/appOrderLifecycle";
 import { isAppOrderCancelled } from "@/lib/deliveryStatus";
 import {
   isScheduleInputBefore,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/format";
 
 type KnightOpt = { id: string; display_name: string };
+type AppInvoiceSummary = { payment_status?: string | null; total_amount?: number | null };
 type AppOrderSummary = {
   id?: string;
   order_code?: string | null;
@@ -42,7 +44,8 @@ type AppOrderSummary = {
   rider_assigned_at?: string | null;
   pending_knight_id?: string | null;
   payment_deadline_at?: string | null;
-  invoices?: { payment_status?: string | null }[] | { payment_status?: string | null } | null;
+  confirm_deadline_at?: string | null;
+  invoices?: AppInvoiceSummary[] | AppInvoiceSummary | null;
 };
 type DeliverySnapshot = {
   id: string;
@@ -141,9 +144,21 @@ function appDeliverySchedule(order?: AppOrderSummary | null) {
   return drop.toISOString();
 }
 
-function appInvoicePaymentStatus(order?: AppOrderSummary | null) {
+function appInvoice(order?: AppOrderSummary | null): AppInvoiceSummary | null {
   const invoice = Array.isArray(order?.invoices) ? order?.invoices[0] : order?.invoices;
-  return String(invoice?.payment_status ?? "pending").toLowerCase();
+  return invoice ?? null;
+}
+
+/** Re-render every 30s while a deadline is shown, so the time left stays current. */
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!active) return;
+    setNow(new Date());
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return now;
 }
 
 export default function DeliveryLifecycleActions({
@@ -181,15 +196,49 @@ export default function DeliveryLifecycleActions({
   const appRank = statusRank[appStatus ?? ""] ?? 0;
   const isAppOrder = Boolean(delivery.app_order_id);
   const hasKnight = Boolean(delivery.knight_name?.trim() || delivery.knight_id);
+  // Pay-first: the customer pays, ops confirm (before confirm_deadline_at),
+  // then ops assign a knight. confirmed_at is the source of truth; older
+  // rows loaded without it fall back to the status / accepted_at.
+  const appOrder = delivery.app_order;
+  const hasConfirmedAtField = Boolean(appOrder && "confirmed_at" in appOrder);
   const isConfirmed = Boolean(
-    delivery.app_order?.confirmed_at
-    || delivery.app_order?.accepted_at
-    || appRank >= statusRank.accepted,
+    appOrder?.confirmed_at
+    || appRank >= statusRank.rider_assigned
+    || (!hasConfirmedAtField && (appOrder?.accepted_at || appRank >= statusRank.accepted)),
   );
-  const isPaid = appInvoicePaymentStatus(delivery.app_order) === "paid";
-  const needsConfirmOrder = isAppOrder && !isConfirmed && appRank < statusRank.accepted;
-  const awaitingPayment = isAppOrder && isConfirmed && !isPaid && !hasKnight;
-  const canAssignKnight = isAppOrder && isConfirmed && isPaid && !hasKnight;
+  const stage = isAppOrder
+    ? appOrderStage(
+        {
+          status: appStatus,
+          confirmed_at: isConfirmed ? (appOrder?.confirmed_at ?? "legacy") : null,
+          confirm_deadline_at: appOrder?.confirm_deadline_at,
+        },
+        appInvoice(appOrder),
+      )
+    : null;
+  const awaitingPayment = !hasKnight && stage === "awaiting_payment";
+  const confirmWindowClosed = !hasKnight && stage === "confirm_window_closed";
+  const needsConfirmOrder = !hasKnight && stage === "ready_to_confirm";
+  const canAssignKnight = !hasKnight && stage === "confirmed";
+  const assignBlocked = awaitingPayment || confirmWindowClosed;
+  const deadlineIso = awaitingPayment
+    ? appOrder?.payment_deadline_at
+    : needsConfirmOrder
+      ? appOrder?.confirm_deadline_at
+      : null;
+  const now = useNow(Boolean(deadlineIso));
+  const timeLeft = timeLeftLabel(deadlineIso, now);
+  const stageHint = awaitingPayment
+    ? timeLeft
+      ? `Customer has ${timeLeft} to pay.`
+      : "Waiting for the customer to pay."
+    : needsConfirmOrder
+      ? timeLeft
+        ? `Paid. Confirm within ${timeLeft}.`
+        : "Paid. Confirm the order, then assign a knight."
+      : confirmWindowClosed
+        ? APP_ORDER_MESSAGES.confirmWindowClosed
+        : null;
   const needsAssignmentConfirmation = canAssignKnight || (!isAppOrder && !hasKnight && appRank < statusRank.rider_assigned);
   const isCancelled =
     isAppOrderCancelled(delivery.app_order) || delivery.fulfillment_status === "cancelled";
@@ -209,6 +258,10 @@ export default function DeliveryLifecycleActions({
       ? compact
         ? "Awaiting pay"
         : "Awaiting payment"
+      : confirmWindowClosed
+        ? compact
+          ? "Closed"
+          : "Confirm window closed"
       : needsAssignmentConfirmation
         ? compact
           ? "Assign"
@@ -255,7 +308,11 @@ export default function DeliveryLifecycleActions({
       return;
     }
     if (awaitingPayment) {
-      setError("Waiting for customer payment before a knight can be assigned.");
+      setError(APP_ORDER_MESSAGES.awaitingPayment);
+      return;
+    }
+    if (confirmWindowClosed) {
+      setError(APP_ORDER_MESSAGES.confirmWindowClosed);
       return;
     }
 
@@ -345,7 +402,7 @@ export default function DeliveryLifecycleActions({
             <Button
               size="small"
               variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
-              disabled={busyAction !== null || isCancelled || awaitingPayment}
+              disabled={busyAction !== null || isCancelled || assignBlocked}
               onClick={openAssignment}
               sx={compactBtnSx}
             >
@@ -379,7 +436,7 @@ export default function DeliveryLifecycleActions({
               <Button
                 size="small"
                 variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
-                disabled={busyAction !== null || isCancelled || awaitingPayment}
+                disabled={busyAction !== null || isCancelled || assignBlocked}
                 onClick={openAssignment}
                 sx={compactBtnSx}
               >
@@ -414,7 +471,7 @@ export default function DeliveryLifecycleActions({
             <Button
               size="small"
               variant={needsConfirmOrder || canAssignKnight ? "contained" : "outlined"}
-              disabled={busyAction !== null || isCancelled || awaitingPayment}
+              disabled={busyAction !== null || isCancelled || assignBlocked}
               onClick={openAssignment}
               sx={compactBtnSx}
             >
@@ -441,6 +498,12 @@ export default function DeliveryLifecycleActions({
           </>
         ) : null}
       </Stack>
+
+      {stageHint && !isCancelled && !error ? (
+        <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: "text.secondary" }}>
+          {stageHint}
+        </Typography>
+      ) : null}
 
       {error && !assignOpen ? (
         <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.75 }}>
@@ -469,7 +532,9 @@ export default function DeliveryLifecycleActions({
             {variant === "running"
               ? "Change the knight or scheduled pickup/delivery times."
               : needsAssignmentConfirmation
-                ? "Choose who will handle this delivery. This confirms the booking and starts delivery in the app."
+                ? isAppOrder
+                  ? "Choose who will handle this delivery. The knight will see it in their orders in the app."
+                  : "Choose who will handle this delivery."
                 : "Update the delivery assignment and timing."}
           </Typography>
 
