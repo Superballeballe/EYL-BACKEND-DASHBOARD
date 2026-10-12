@@ -251,12 +251,69 @@ export type CancelledOrder = {
   total_amount: number | null;
   cancellation_fee: number;
   refund_amount: number;
-  refund_status: "none" | "pending" | "refunded";
+  /** Unknown future values are shown raw (lib/refunds refundStatusInfo). */
+  refund_status: "none" | "pending" | "processing" | "refunded" | "failed" | (string & {});
   pickup_address: string | null;
   delivery_address: string | null;
   cancelled_at: string;
   refund_ref?: string | null;
   refunded_at?: string | null;
+  captured_amount_paise?: number | null;
+  refund_amount_paise?: number | null;
+  refund_attempts?: number | null;
+  refund_next_attempt_at?: string | null;
+  refund_lease_until?: string | null;
+  refund_last_error?: string | null;
+  refund_last_cause?: string | null;
+  refund_queued_at?: string | null;
+  refund_resolution_note?: string | null;
+  refund_resolved_by?: string | null;
+  /** Razorpay payment the refund is for (20261012150000). */
+  payment_ref?: string | null;
+};
+
+/** public.payment_refunds: one row per refunded (or would-be refunded) payment. */
+export type PaymentRefund = {
+  razorpay_payment_id: string;
+  order_id: string | null;
+  cancelled_order_id: string | null;
+  payment_review_id: string | null;
+  origin: string;
+  source: string | null;
+  status: "claimed" | "dry_run" | "skipped" | (string & {});
+  mode: "live" | "dry_run" | "off" | null;
+  amount_paise: number | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** public.payment_reviews: captured payments ops must refund or resolve by hand. */
+export type PaymentReview = {
+  id: string;
+  order_id: string | null;
+  order_code: string | null;
+  invoice_id: string | null;
+  razorpay_payment_id: string;
+  razorpay_order_id: string | null;
+  kind: "wrong_amount" | "duplicate" | "other" | (string & {});
+  expected_paise: number | null;
+  captured_paise: number | null;
+  captured_at: string | null;
+  detected_by: string | null;
+  detail: string | null;
+  status: "open" | "refunded" | "resolved" | (string & {});
+  refund_ref: string | null;
+  refund_status: string | null;
+  refunded_paise: number | null;
+  refund_attempts: number;
+  last_error: string | null;
+  lease_until: string | null;
+  resolution_note: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type HubContact = {
