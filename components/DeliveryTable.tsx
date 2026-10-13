@@ -35,7 +35,7 @@ import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money, routeAreaLabel } from "@/lib/format";
 import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
 import { deliverySchedule } from "@/lib/deliverySchedule";
-import { effectiveFulfillmentStatus } from "@/lib/deliveryStatus";
+import { effectiveFulfillmentStatus, lifecycleStage } from "@/lib/deliveryStatus";
 import type { Delivery } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
@@ -187,7 +187,12 @@ export default function DeliveryTable({
                     time={joinText(schedule.drop, delivery.drop_actual_time)}
                   />
                 </TableCell>
-                <TableCell title={delivery.knight_name ?? undefined}>{delivery.knight_name ?? "—"}</TableCell>
+                <TableCell
+                  title={delivery.knight_name ?? undefined}
+                  sx={delivery.knight_name?.trim() ? undefined : { color: "text.secondary" }}
+                >
+                  {delivery.knight_name?.trim() || "Unassigned"}
+                </TableCell>
                 <TableCell align="center" className="pill-cell">
                   <PaymentBadge status={delivery.payment_status} mode={delivery.payment_mode} />
                 </TableCell>
@@ -235,14 +240,6 @@ function orderMeta(delivery: Delivery) {
   return { orderId, source };
 }
 
-function previewLifecycleVariant(
-  status: string | null | undefined,
-): "pending" | "running" | null {
-  if (status === "booked") return "pending";
-  if (status === "accepted" || status === "active") return "running";
-  return null;
-}
-
 export function DeliveryPreviewModal({
   delivery,
   knights,
@@ -265,7 +262,7 @@ export function DeliveryPreviewModal({
   const router = useRouter();
   /** The rail's selection: the read-only overview, the next-step actions, or one section of the edit form. */
   const [selectedView, setView] = useState<"overview" | "actions" | number>("overview");
-  const actionVariant = previewLifecycleVariant(delivery.fulfillment_status);
+  const actionVariant = lifecycleStage(delivery.fulfillment_status);
   // A finished or cancelled order has no next step; fall back rather than show an empty tab.
   const view = selectedView === "actions" && !actionVariant ? "overview" : selectedView;
   const formRef = useRef<DeliveryFormHandle>(null);
@@ -564,7 +561,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
           <DetailRow label="Order ID" value={orderId} />
           <DetailRow label="Source" value={source} />
           <DetailRow label="Sender" value={delivery.sender_name} />
-          <DetailRow label="Knight" value={delivery.knight_name} />
+          <DetailRow label="Knight" value={delivery.knight_name?.trim() || "Unassigned"} />
           <DetailRow label="Fees" value={money(delivery.fees)} />
           <DetailRow
             label="Payment"
@@ -572,8 +569,8 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
           />
           <DetailRow label="Kms" value={delivery.kms == null ? null : `${delivery.kms} km`} />
           <DetailRow label="Mode" value={formatBookingMode(delivery.mode_of_booking)} />
-          <DetailRow label="Invoice" value={delivery.invoice_no} />
-          <DetailRow label="Billing" value={delivery.billing_name} />
+          <DetailRow label="Invoice no." value={delivery.invoice_no} />
+          <DetailRow label="Billed to" value={delivery.billing_name} />
           {delivery.content ? <DetailRow label="Content" value={delivery.content} /> : null}
           {delivery.remark ? <DetailRow label="Remark" value={delivery.remark} /> : null}
           {instructions.multiDrop ? <DetailRow label="Multidrop notes" value={instructions.multiDrop} /> : null}
