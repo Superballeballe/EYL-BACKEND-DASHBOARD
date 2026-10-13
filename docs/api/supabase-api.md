@@ -24,7 +24,7 @@ The consumer and knight apps both create Supabase clients with the **anon key** 
 | `cancelled_orders` | Select own cancellation/refund rows | **Live verified:** `authenticated` has `SELECT` and `cancelled_orders_select_own` limits rows to `user_id=auth.uid()`. |
 | `monthly_coupons` | Select active coupon metadata | Read policy; validation/discount calculation is performed by Edge Function. |
 | `coupon_redemptions` | Select own redemption markers | Used for display; insert is trigger/function controlled. |
-| `hub_contacts` | Select active "Call the Hub" contacts (`id,label,description,phone,sort_order`) | Column grant + `hub_contacts_read_active`; writes are admin-only (`get_my_role()='admin'`), at most 10 active rows (trigger). Managed from the dashboard's Hub contacts page. |
+| `hub_contacts` | Select active customer care contacts ("Urgent, connect with us"; the app uses the first) (`id,label,description,phone,sort_order`) | Column grant + `hub_contacts_read_active`; writes are admin-only (`get_my_role()='admin'`), at most 10 active rows (trigger). Managed from the dashboard's Customer care page, which keeps one row active. |
 | `app_push_tokens` | Upsert own Expo token | User-scoped policies. |
 
 Sources: [booking service](../../../EYL-APP/src/services/bookingService.js), [address service](../../../EYL-APP/src/services/savedAddressService.js), [coupon service](../../../EYL-APP/src/services/couponService.js), [notification service](../../../EYL-APP/src/services/notificationService.js).
@@ -74,7 +74,6 @@ Functions live under [`EYL-APP/supabase/functions`](../../../EYL-APP/supabase/fu
 | `geocode` | JWT; consumer | `{query,bias?}`; authenticated Google geocoding proxy. |
 | `verify-gstin` | JWT; consumer | `{gstin,requireActive}`; authenticated GST verification proxy. |
 | `delete-account` | JWT; consumer | Deletes signed-in consumer data and auth account. |
-| `realtime-token` | JWT; consumer voice | Issues short-lived OpenAI Realtime credentials and records usage session. |
 | `send-signup-code` | Public by repository config | `{email,purpose}`; stores hashed OTP and sends signup/change code. |
 | `verify-otp-code` | Invoked publicly by consumer | `{email,token,purpose}`; validates OTP and may return signup session credentials. |
 | `send-account-notice` | Public by repository config | Sends account-change notices. |

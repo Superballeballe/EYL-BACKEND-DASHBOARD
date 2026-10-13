@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import CouponsBoard from "@/components/CouponsBoard";
 import type { CouponRedemption, MonthlyCoupon } from "@/lib/types";
@@ -39,6 +40,7 @@ export default async function CouponsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader title="Coupons" subtitle="Promo codes for the EYL mobile app" />
       <CouponsBoard coupons={coupons} redemptions={redemptionRows} />
     </div>

@@ -26,7 +26,7 @@ A hardened Docker Compose setup for self-hosting the Next.js dashboard.
 | `API_KEY` | Secret for `x-api-key` write endpoints |
 | `DASHBOARD_DOMAIN` | (proxy only) real hostname for Let's Encrypt TLS |
 
-> Razorpay keys live in **Supabase Edge Function secrets** (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`). The dashboard refunds via the `razorpay-refund` function — do not duplicate keys in `.env.local`.
+> Razorpay keys live in **Supabase Edge Function secrets** (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`). The dashboard never calls Razorpay or `razorpay-refund`; ops clicks go through the `ops-refund` function. Do not put Razorpay keys in `.env.local`.
 
 > The DB schema must already be applied (`supabase/migrations/0001_init.sql`).
 >
@@ -77,28 +77,34 @@ docker compose --env-file .env.local down
 - **Security headers** both at the app (`next.config.mjs`) and the edge (Caddy), plus HSTS over TLS.
 - Secrets via `env_file` at runtime; `NEXT_PUBLIC_*` also passed as **build args** so the client bundle gets Maps/Supabase public config. `.dockerignore` keeps `.env*` out of the build context.
 
-## Auto-refund queue
+## Refunds (owned by the database, not the dashboard)
 
-When a cancellation sets `refund_status = pending`, the dashboard SSE queue
-(`/api/refunds/stream`) picks it up and processes refunds automatically while
-an ops user has the dashboard open. Every attempt is logged in `refund_events`.
+Automatic refunds run only in the database and Supabase edge functions
+(pg_cron + `razorpay-refund-worker`; see EYL-APP `docs/payment-safety.md`).
+The dashboard never sends a refund on its own:
 
-For coverage when nobody is logged in, add a cron on the host (every 2–5 min):
+- `/api/refunds/stream` only tells open tabs to refresh.
+- `/api/refunds/process-pending` is retired and returns `410`.
+- Ops actions (retry a failed refund, refund after pickup, payment reviews)
+  call `ops-refund` with the signed-in user as `actor`.
+- The lifecycle cancel calls `ops_cancel_order` (100% refund before pickup,
+  no fee).
 
-```bash
-# /etc/cron.d/eyl-refunds — replace DOMAIN and API_KEY
-*/3 * * * * root curl -sf -X POST \
-  -H "x-api-key: YOUR_API_KEY" \
-  "https://DASHBOARD_DOMAIN/api/refunds/process-pending?limit=20" \
-  > /dev/null
-```
+### Deploy order for the payment-safety release
 
-Manual trigger (signed-in session or same `x-api-key`):
-
-```bash
-curl -X POST -H "x-api-key: $API_KEY" \
-  "https://dashboard.example.com/api/refunds/process-pending?limit=20"
-```
+1. EYL-APP migrations through `20261012190000_ops_cancel_order.sql`
+   (`supabase db push`). The old dashboard keeps working: any fee row it still
+   writes is left for manual handling, never auto-refunded.
+2. **This dashboard.** Then, on the server, remove the old refund cron and
+   script:
+   ```bash
+   sudo rm -f /etc/cron.d/eyl-refunds
+   sudo rm -f /path/to/scripts/process-pending-refunds.sh   # server-only, never in git
+   ```
+   Until they are removed they only get `410`s.
+3. EYL-APP edge functions (`ops-refund`, `razorpay-refund-worker`,
+   `razorpay-refund`, `razorpay-webhook`, `razorpay-sync`, `razorpay-verify`,
+   `razorpay-reconcile`).
 
 ## Before this is truly production-ready
 

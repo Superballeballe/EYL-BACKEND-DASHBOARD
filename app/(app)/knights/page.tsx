@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import KnightsBoard from "@/components/KnightsBoard";
 import type { Knight } from "@/lib/types";
@@ -11,6 +12,7 @@ export default async function KnightsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader title="Knights" subtitle={`${knights.length} delivery staff`} />
       <KnightsBoard knights={knights} />
     </div>

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import ClientsBoard from "@/components/ClientsBoard";
 import type { Client } from "@/lib/types";
@@ -11,6 +12,7 @@ export default async function ClientsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader title="Clients" subtitle={`${clients.length} billing records`} />
       <ClientsBoard clients={clients} />
     </div>

@@ -1,18 +1,22 @@
 import { sessionFromRequest } from "@/lib/server/session";
-import { processPendingRefunds } from "@/lib/server/processRefund";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** SSE queue: watch pending refunds and auto-process when cancellations arrive. */
+/** Tables whose changes refresh the refund views (if they are in the realtime publication). */
+const WATCHED = ["cancelled_orders", "payment_reviews", "payment_refunds"] as const;
+
+/**
+ * SSE: tells open dashboard tabs that refund data changed so they refresh.
+ * Notify only. It never sends, retries or records a refund.
+ */
 export async function GET(req: Request) {
   const session = await sessionFromRequest(req);
   if (!session) return new Response("Unauthorized", { status: 401 });
 
   const encoder = new TextEncoder();
   let closed = false;
-  let processing = false;
   let debounce: ReturnType<typeof setTimeout> | null = null;
 
   const stream = new ReadableStream({
@@ -22,43 +26,20 @@ export async function GET(req: Request) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
       };
 
-      const runQueue = async () => {
-        if (processing || closed) return;
-        processing = true;
-        try {
-          const results = await processPendingRefunds({ source: "auto", limit: 10 });
-          const touched = results.filter((r) => r.ok).length;
-          if (touched > 0) {
-            send("processed", JSON.stringify({ count: touched, results }));
-          }
-          send("change");
-        } catch (err) {
-          send("error", err instanceof Error ? err.message : "refund queue failed");
-        } finally {
-          processing = false;
-        }
-      };
-
-      const schedule = () => {
+      const notify = (table: string) => {
         if (debounce) clearTimeout(debounce);
-        debounce = setTimeout(() => {
-          void runQueue();
-        }, 500);
+        debounce = setTimeout(() => send("change", table), 500);
       };
 
       const keepalive = setInterval(() => send("ping"), 30_000);
       const db = supabaseAdmin();
-      const channel = db
-        .channel(`refunds-stream-${session.userId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "cancelled_orders" },
-          () => schedule(),
-        )
-        .subscribe();
+      let channel = db.channel(`refunds-stream-${session.userId}-${Date.now()}`);
+      for (const table of WATCHED) {
+        channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => notify(table));
+      }
+      channel.subscribe();
 
       send("ready");
-      void runQueue();
 
       req.signal.addEventListener("abort", () => {
         closed = true;

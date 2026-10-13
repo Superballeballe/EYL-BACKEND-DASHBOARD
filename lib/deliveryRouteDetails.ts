@@ -1,3 +1,4 @@
+import { composeAddressLine } from "@/lib/addressFormat";
 import type { Delivery } from "@/lib/types";
 
 export type DeliveryStop = {
@@ -37,13 +38,10 @@ export function deliveryInvoiceMeta(delivery: Pick<Delivery, "raw" | "app_order"
   return null;
 }
 
+/** Flat, floor and building first, then the map line (see lib/addressFormat.ts). */
 function formatStopLine(stop: StopRecord): string | null {
-  const line = stop.line ?? stop.address;
-  if (typeof line === "string" && line.trim()) return line.trim();
-  const parts = [stop.building, stop.floor, stop.apartment, stop.company]
-    .filter((part) => typeof part === "string" && part.trim())
-    .map((part) => String(part).trim());
-  return parts.length ? parts.join(" · ") : null;
+  const composed = composeAddressLine({ ...stop, line: stop.line ?? stop.address });
+  return composed || null;
 }
 
 function normalizeStop(stop: StopRecord, index: number, total: number): DeliveryStop {

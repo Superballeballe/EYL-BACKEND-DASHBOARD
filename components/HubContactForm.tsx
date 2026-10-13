@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Alert, Box, Button, FormControlLabel, Stack, Switch, TextField } from "@mui/material";
+import { whatsAppPreview } from "@/lib/hubContacts";
 import type { HubContact } from "@/lib/types";
 
 type HubContactFormProps = {
@@ -53,7 +54,7 @@ export default function HubContactForm({ contactId, onSuccess, initial }: HubCon
           size="small"
           fullWidth
           label="Label"
-          placeholder="Dispatch"
+          placeholder="Customer care"
           value={v.label}
           onChange={(e) => set("label", e.target.value)}
           slotProps={{ htmlInput: { maxLength: 40 } }}
@@ -65,20 +66,24 @@ export default function HubContactForm({ contactId, onSuccess, initial }: HubCon
           size="small"
           fullWidth
           label="Description (optional)"
-          placeholder="Pickup issues"
+          placeholder="Official EYL number"
           value={v.description}
           onChange={(e) => set("description", e.target.value)}
-          helperText="Shown under the label in the app's sheet"
+          helperText="For ops reference"
         />
 
         <TextField
           size="small"
           fullWidth
           label="Phone"
-          placeholder="+919876543210"
+          placeholder="+918691911911"
           value={v.phone}
           onChange={(e) => set("phone", e.target.value)}
-          helperText="+ and the country code, e.g. +919876543210"
+          helperText={
+            /^\+[1-9][0-9]{7,14}$/.test(v.phone.replace(/[\s\-()]/g, ""))
+              ? `WhatsApp: ${whatsAppPreview(v.phone)}`
+              : "+ and the country code, e.g. +918691911911"
+          }
           required
         />
 
@@ -95,7 +100,7 @@ export default function HubContactForm({ contactId, onSuccess, initial }: HubCon
 
         <FormControlLabel
           control={<Switch checked={v.active} onChange={(e) => set("active", e.target.checked)} />}
-          label="Active (shown in the app)"
+          label="Active: show under “Urgent, connect with us” in the app (hides any other active contact)"
         />
 
         {err ? <Alert severity="error">{err}</Alert> : null}

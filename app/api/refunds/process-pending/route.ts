@@ -1,41 +1,25 @@
-import { badRequest, ok, serverError, unauthorized } from "@/lib/api";
-import { checkApiKey } from "@/lib/auth";
-import { processPendingRefunds } from "@/lib/server/processRefund";
-import { requireSessionUser } from "@/lib/server/session";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/** Process all pending customer refunds (cron or manual ops trigger). */
-export async function POST(req: Request) {
-  const viaCron = checkApiKey(req);
-  if (!viaCron) {
-    try {
-      await requireSessionUser();
-    } catch (e) {
-      if (e instanceof Error && e.message === "UNAUTHORIZED") {
-        return unauthorized("Sign in required");
-      }
-      return serverError(e);
-    }
-  }
+/**
+ * Retired. The dashboard never sends refunds on its own any more: the
+ * database refund worker (pg_cron + razorpay-refund-worker) owns automatic
+ * refunds, and ops refund by hand through ops-refund (Refunds page).
+ *
+ * Kept as a 410 so the old VPS cron (/etc/cron.d/eyl-refunds) fails loudly
+ * and harmlessly until it is removed. Takes no auth, reads nothing, writes
+ * nothing.
+ */
+const GONE = {
+  processed: 0,
+  note: "Retired: the dashboard no longer processes refunds. Remove the eyl-refunds cron on the server.",
+};
 
-  try {
-    const url = new URL(req.url);
-    const limit = Number(url.searchParams.get("limit") ?? 20);
-    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
-      return badRequest("limit must be between 1 and 100");
-    }
+export function POST() {
+  return NextResponse.json(GONE, { status: 410 });
+}
 
-    const results = await processPendingRefunds({
-      source: viaCron ? "cron" : "manual",
-      limit,
-    });
-    const succeeded = results.filter((r) => r.ok && !r.already).length;
-    const failed = results.filter((r) => !r.ok).length;
-    const skipped = results.filter((r) => r.already).length;
-
-    return ok({ processed: results.length, succeeded, failed, skipped, results });
-  } catch (e) {
-    return serverError(e);
-  }
+export function GET() {
+  return NextResponse.json(GONE, { status: 410 });
 }

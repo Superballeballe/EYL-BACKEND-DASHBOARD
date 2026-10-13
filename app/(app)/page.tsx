@@ -1,4 +1,5 @@
 import Typography from "@mui/material/Typography";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import DashboardShell from "@/components/DashboardShell";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
@@ -142,7 +143,7 @@ async function getData(today: string) {
       db
         .from("cancelled_orders")
         .select("*")
-        .eq("refund_status", "pending")
+        .in("refund_status", ["pending", "processing", "failed"])
         .order("cancelled_at", { ascending: false })
         .limit(80),
     ]);
@@ -233,6 +234,7 @@ export default async function Dashboard() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Dashboard"
         subtitle={

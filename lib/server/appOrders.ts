@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Delivery } from "@/lib/types";
 
 const APP_ORDER_SELECTS = [
+  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, confirm_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, total_amount, metadata)",
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, metadata)",
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at",
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
@@ -37,11 +38,14 @@ async function enrichAppOrdersWithRouteMeta(
   const ids = orders.map((order) => order.id);
 
   const [{ data: invoices }, { data: orderRows }] = await Promise.all([
-    db.from("invoices").select("order_id, payment_status, metadata").in("order_id", ids),
+    db.from("invoices").select("order_id, payment_status, total_amount, metadata").in("order_id", ids),
     db.from("orders").select("id, pickup_instructions, delivery_instructions").in("id", ids),
   ]);
 
-  const invoiceByOrder = new Map<string, { payment_status?: string | null; metadata?: Record<string, unknown> | null }>();
+  const invoiceByOrder = new Map<
+    string,
+    { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }
+  >();
   for (const invoice of invoices ?? []) {
     if (!invoiceByOrder.has(invoice.order_id)) {
       invoiceByOrder.set(invoice.order_id, invoice);
@@ -64,6 +68,7 @@ async function enrichAppOrdersWithRouteMeta(
       invoices: invoice
         ? {
             payment_status: invoice.payment_status ?? existing?.payment_status ?? null,
+            total_amount: invoice.total_amount ?? existing?.total_amount ?? null,
             metadata: invoice.metadata ?? existing?.metadata ?? null,
           }
         : order.invoices ?? existing ?? null,

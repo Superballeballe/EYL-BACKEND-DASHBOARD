@@ -12,32 +12,11 @@ servers:
   - url: https://mjoddxztryqjtjaseusc.supabase.co/functions/v1
     description: Live Supabase project
 tags:
-  - name: AI
   - name: Messaging
   - name: Payments
   - name: Account
   - name: Utilities
 paths:
-  /parse-intent:
-    post:
-      tags: [AI]
-      summary: Parse a user's intent
-      description: JWT-protected. Exact request and response fields were not inspected here.
-      security: [{ supabase_jwt: [] }]
-      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
-      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
-  /transcribe:
-    post:
-      tags: [AI]
-      summary: Transcribe submitted audio
-      description: JWT-protected. The exact upload format and response fields were not inspected here.
-      security: [{ supabase_jwt: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json: { schema: { $ref: "#/components/schemas/GenericObject" } }
-          multipart/form-data: { schema: { type: object, additionalProperties: true } }
-      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
   /whatsapp-webhook:
     get:
       tags: [Messaging]
@@ -111,14 +90,6 @@ paths:
       tags: [Payments]
       summary: Validate a coupon
       description: JWT-protected. Exact coupon payload and result fields were not inspected here.
-      security: [{ supabase_jwt: [] }]
-      requestBody: { $ref: "#/components/requestBodies/GenericJson" }
-      responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }
-  /realtime-token:
-    post:
-      tags: [Account]
-      summary: Issue realtime authorization data
-      description: JWT-protected. Exact request and token response fields were not inspected here.
       security: [{ supabase_jwt: [] }]
       requestBody: { $ref: "#/components/requestBodies/GenericJson" }
       responses: { "200": { $ref: "#/components/responses/GenericJson" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "500": { $ref: "#/components/responses/Error" } }

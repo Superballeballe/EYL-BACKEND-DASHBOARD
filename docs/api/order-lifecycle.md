@@ -132,22 +132,17 @@ sequenceDiagram
     participant Actor as Consumer or ops
     participant DB as Supabase DB
     participant CO as cancelled_orders
-    participant Q as Refund processor
-    participant RF as razorpay-refund
-    participant E as refund_events
+    participant W as razorpay-refund-worker
 
-    Actor->>DB: Cancel before pickup
-    DB->>CO: Snapshot reason, payment and amounts
+    Actor->>DB: Cancel before pickup (cancel_customer_order / ops_cancel_order)
+    DB->>CO: Snapshot reason and payment, cancellation_fee = 0
     alt Paid order
-        DB->>CO: fee = round(total * 10%); refund = total - fee; status pending
-        Q->>RF: Refund with cancellation idempotency key
-        RF-->>Q: Refund reference
-        Q->>CO: Mark refunded
-        Q->>E: Log manual, auto, or cron outcome
+        DB->>CO: refund = 100%, status pending (payment_refunds claim)
+        W->>CO: Refund via Razorpay, mark refunded
     else Unpaid order
         DB->>CO: refund_status = none
     end
     DB->>DB: Mark order and delivery cancelled
 ```
 
-Customer cancellation uses `cancel_customer_order`; dashboard cancellation implements the same hardcoded 10% paid-order fee in the HTTP lifecycle handler. Both reject cancellation after pickup. Dashboard manual refund, refund SSE automation, and API-key cron processing share the same processor and append `refund_events` for success, failure or skip. [Lifecycle route](../../app/api/deliveries/[id]/lifecycle/route.ts) and [refund processor](../../lib/server/processRefund.ts).
+Customer cancellation uses `cancel_customer_order`; dashboard cancellation calls `ops_cancel_order`. Both refuse after pickup and refund a paid order 100% before pickup, automatically, through the database worker. After pickup nothing is automatic: ops refund by hand through `ops-refund`. The dashboard has no refund processor. [Lifecycle route](../../app/api/deliveries/[id]/lifecycle/route.ts) and [ops cancel](../../lib/server/opsCancel.ts).

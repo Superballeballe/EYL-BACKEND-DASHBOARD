@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { hubContactSchema } from "@/lib/schemas";
 import { created, ok, parseBody, serverError } from "@/lib/api";
-import { HUB_CONTACT_COLUMNS, hubContactWriteError } from "@/lib/server/hubContacts";
+import { HUB_CONTACT_COLUMNS, deactivateOtherContacts, hubContactWriteError } from "@/lib/server/hubContacts";
 
 export const runtime = "nodejs";
 
@@ -32,6 +32,10 @@ export async function POST(req: Request) {
       .select(HUB_CONTACT_COLUMNS)
       .single();
     if (error) return hubContactWriteError(error) ?? serverError(error);
+    if (data.active) {
+      const failed = await deactivateOtherContacts(data.id);
+      if (failed) return failed;
+    }
     return created(data);
   } catch (e) {
     return serverError(e);

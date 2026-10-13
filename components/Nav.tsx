@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Avatar,
+  Badge,
   Box,
   Divider,
   List,
@@ -18,6 +19,7 @@ import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
+import CurrencyRupeeOutlinedIcon from "@mui/icons-material/CurrencyRupeeOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -39,6 +41,7 @@ const LINKS = [
   { href: "/", label: "Dashboard", Icon: DashboardOutlinedIcon },
   { href: "/deliveries", label: "Deliveries", Icon: LocalShippingOutlinedIcon },
   { href: "/cancelled-orders", label: "Cancelled orders", Icon: CancelOutlinedIcon },
+  { href: "/refunds", label: "Refunds", Icon: CurrencyRupeeOutlinedIcon },
   { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
   { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
   { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
@@ -47,7 +50,7 @@ const LINKS = [
   { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
   { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
   { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
-  { href: "/hub-contacts", label: "Hub contacts", Icon: PhoneInTalkOutlinedIcon },
+  { href: "/hub-contacts", label: "Customer care", Icon: PhoneInTalkOutlinedIcon },
   { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
 ] as const;
 
@@ -85,7 +88,9 @@ function NavItem({
   active,
   collapsed,
   mounted,
+  badge = 0,
 }: {
+  badge?: number;
   href: string;
   label: string;
   Icon: (typeof LINKS)[number]["Icon"] | (typeof ADMIN_LINKS)[number]["Icon"];
@@ -104,7 +109,15 @@ function NavItem({
         aria-label={collapsed ? label : undefined}
       >
         <ListItemIcon sx={{ minWidth: 36, justifyContent: "center" }}>
-          <Icon fontSize="small" />
+          <Badge
+            color="warning"
+            badgeContent={badge}
+            invisible={badge <= 0}
+            max={99}
+            aria-label={badge > 0 ? `${badge} need review` : undefined}
+          >
+            <Icon fontSize="small" />
+          </Badge>
         </ListItemIcon>
         <ListItemText
           primary={label}
@@ -144,8 +157,11 @@ function userInitials(name: string | null, email: string) {
 
 export default function Nav({
   user,
+  reviewCount = 0,
 }: {
   user: { email: string; name: string | null; role: "admin" | "operator" };
+  /** Open payment_reviews: badge on Refunds. */
+  reviewCount?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -348,6 +364,7 @@ export default function Nav({
               active={isActive(href)}
               collapsed={collapsed}
               mounted={mounted}
+              badge={href === "/refunds" ? reviewCount : 0}
             />
           </Box>
         ))}

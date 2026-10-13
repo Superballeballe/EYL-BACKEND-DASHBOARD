@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { hubContactUpdateSchema } from "@/lib/schemas";
 import { notFound, ok, parseBody, serverError } from "@/lib/api";
-import { HUB_CONTACT_COLUMNS, hubContactWriteError } from "@/lib/server/hubContacts";
+import { HUB_CONTACT_COLUMNS, deactivateOtherContacts, hubContactWriteError } from "@/lib/server/hubContacts";
 
 export const runtime = "nodejs";
 
@@ -20,6 +20,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
       .maybeSingle();
     if (error) return hubContactWriteError(error) ?? serverError(error);
     if (!data) return notFound("Hub contact not found");
+    if (data.active) {
+      const failed = await deactivateOtherContacts(data.id);
+      if (failed) return failed;
+    }
     return ok(data);
   } catch (e) {
     return serverError(e);
