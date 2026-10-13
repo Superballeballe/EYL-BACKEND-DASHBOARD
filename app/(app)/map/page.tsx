@@ -1,7 +1,10 @@
 import PlottingMapBoard from "@/components/PlottingMapBoard";
 import { attachAppOrders } from "@/lib/server/appOrders";
+import { getDeliveryFormOptions } from "@/lib/server/formOptions";
+import { getSessionUser } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { todayISO } from "@/lib/format";
+import type { Delivery } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -67,9 +70,8 @@ export default async function MapPage({
 
   let query = db
     .from("deliveries")
-    .select(
-      "id, serial_no, sender_name, pickup_location, drop_location, pickup_lat, pickup_lng, drop_lat, drop_lng, knight_name, knight_id, fulfillment_status, mode_of_booking, app_order_id, task_date",
-    )
+    // Whole rows: a route card can open the order dialog, which shows and edits every field.
+    .select("*")
     .gte("task_date", from)
     .lte("task_date", to)
     .neq("fulfillment_status", "cancelled")
@@ -95,8 +97,12 @@ export default async function MapPage({
     }
   }
 
-  const { data: deliveryRows } = await query;
-  const { rows: deliveries } = await attachAppOrders(db, deliveryRows ?? []);
+  const [{ data: deliveryRows }, formOptions, user] = await Promise.all([
+    query,
+    getDeliveryFormOptions(),
+    getSessionUser(),
+  ]);
+  const { rows: deliveries } = await attachAppOrders(db, (deliveryRows ?? []) as Delivery[]);
 
   const nameSet = new Set<string>();
   const idSet = new Set<string>();
@@ -126,6 +132,10 @@ export default async function MapPage({
     <PlottingMapBoard
       deliveries={deliveries}
       knights={knightsFromDeliveries}
+      assignableKnights={formOptions.knights}
+      clients={formOptions.clients}
+      rateTiers={formOptions.rateTiers}
+      isAdmin={user?.role === "admin"}
       initialMonth={month}
       initialKnightId={knightId}
     />

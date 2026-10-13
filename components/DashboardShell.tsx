@@ -32,6 +32,7 @@ import BusinessOverview, { type ChartBundle } from "@/components/BusinessOvervie
 import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format";
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
 import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
+import { activateOnKey } from "@/lib/keyboard";
 import { formatDeliveryOrderId } from "@/lib/serial";
 import { FOCUS, gray, panelSx, shadow, tableShellSx } from "@/lib/surface";
 import type { CancelledOrder, Delivery, DraftOrder, WorkDay } from "@/lib/types";
@@ -74,14 +75,6 @@ type Props = {
   charts: ChartBundle;
 };
 
-/** Space or Enter on the card itself opens it; keys pressed on the buttons inside are left alone. */
-function openOnKey(event: React.KeyboardEvent<HTMLElement>, open: () => void) {
-  if (event.target !== event.currentTarget) return;
-  if (event.key !== "Enter" && event.key !== " ") return;
-  event.preventDefault();
-  open();
-}
-
 function JobCard({
   delivery: d,
   knights,
@@ -106,7 +99,7 @@ function JobCard({
       tabIndex={0}
       aria-label={`Preview delivery for ${d.sender_name ?? "unknown sender"}`}
       onClick={() => onPreview(d)}
-      onKeyDown={(event) => openOnKey(event, () => onPreview(d))}
+      onKeyDown={(event) => activateOnKey(event, () => onPreview(d))}
       sx={{
         ...panelSx,
         p: 1.5,
@@ -150,7 +143,7 @@ function JobCard({
       <DeliveryTaskBadges delivery={d} />
       {mode === "running" ? (
         <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-          Knight · {d.knight_name ?? "—"}
+          Knight · {d.knight_name?.trim() || "Unassigned"}
           {d.pickup_time_window ? ` · Pickup ${fmtDatetimeLocal(d.pickup_time_window)}` : ""}
         </Typography>
       ) : null}

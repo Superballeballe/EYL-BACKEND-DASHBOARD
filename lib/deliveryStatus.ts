@@ -23,3 +23,10 @@ export function effectiveFulfillmentStatus(delivery: {
   if (isAppOrderCancelled(delivery.app_order)) return "cancelled";
   return delivery.fulfillment_status ?? null;
 }
+
+/** Where an order sits in its lifecycle: waiting for a knight, on its way, or with nothing left to do. */
+export function lifecycleStage(status: string | null | undefined): "pending" | "running" | null {
+  if (status === "booked") return "pending";
+  if (status === "accepted" || status === "active") return "running";
+  return null;
+}
