@@ -74,7 +74,6 @@ Functions live under [`EYL-APP/supabase/functions`](../../../EYL-APP/supabase/fu
 | `geocode` | JWT; consumer | `{query,bias?}`; authenticated Google geocoding proxy. |
 | `verify-gstin` | JWT; consumer | `{gstin,requireActive}`; authenticated GST verification proxy. |
 | `delete-account` | JWT; consumer | Deletes signed-in consumer data and auth account. |
-| `realtime-token` | JWT; consumer voice | Issues short-lived OpenAI Realtime credentials and records usage session. |
 | `send-signup-code` | Public by repository config | `{email,purpose}`; stores hashed OTP and sends signup/change code. |
 | `verify-otp-code` | Invoked publicly by consumer | `{email,token,purpose}`; validates OTP and may return signup session credentials. |
 | `send-account-notice` | Public by repository config | Sends account-change notices. |
