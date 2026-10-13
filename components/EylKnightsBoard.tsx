@@ -30,7 +30,7 @@ import {
 import { EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { formatWorkAreas } from "@/lib/workAreas";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 import type { EylKnight } from "@/lib/types";
 
 const STATUS_COLOR: Record<EylKnight["status"], "default" | "warning" | "info" | "success" | "error"> = {
@@ -77,10 +77,7 @@ export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <FormControl size="small" sx={{ minWidth: 180 }}>
@@ -186,7 +183,7 @@ export default function EylKnightsBoard({ applicants }: { applicants: EylKnight[
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
+          <Button variant="outlined" onClick={() => setDeleteTarget(null)} disabled={deleting}>
             Cancel
           </Button>
           <Button color="error" variant="contained" onClick={removeApplicant} disabled={deleting}>

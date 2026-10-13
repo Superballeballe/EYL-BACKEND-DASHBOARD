@@ -25,10 +25,10 @@ import {
   TableRow,
   TextField,
   Tooltip,
-  Typography,
 } from "@mui/material";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import { PageHeader } from "@/components/ui";
 import { tableShellSx } from "@/lib/surface";
 import { fmtDate } from "@/lib/format";
 
@@ -151,32 +151,17 @@ export default function AdminUsersBoard({
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{
-          mb: 2.5,
-          p: 2,
-          alignItems: { sm: "center" },
-          justifyContent: "space-between",
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Box>
-          <Typography variant="h1">Team</Typography>
-          <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
-            {users.length} user{users.length === 1 ? "" : "s"}
-            {invites.length ? ` · ${invites.length} pending invite${invites.length === 1 ? "" : "s"}` : ""}
-            {" · "}invite teammates by email
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<EmailOutlinedIcon />} onClick={() => setOpen(true)}>
-          Invite user
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Team"
+        subtitle={`${users.length} user${users.length === 1 ? "" : "s"}${
+          invites.length ? ` · ${invites.length} pending invite${invites.length === 1 ? "" : "s"}` : ""
+        } · invite teammates by email`}
+        action={
+          <Button variant="contained" startIcon={<EmailOutlinedIcon />} onClick={() => setOpen(true)}>
+            Invite user
+          </Button>
+        }
+      />
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -192,10 +177,10 @@ export default function AdminUsersBoard({
 
       {invites.length ? (
         <TableContainer sx={{ ...tableShellSx, mb: 2.5 }}>
-          <Table size="small">
+          <Table>
             <TableHead>
               <TableRow>
-                <TableCell colSpan={6} sx={{ fontWeight: 700, bgcolor: "action.hover" }}>
+                <TableCell colSpan={6} sx={{ fontWeight: 600, bgcolor: "action.hover" }}>
                   Pending invites
                 </TableCell>
               </TableRow>
@@ -245,7 +230,7 @@ export default function AdminUsersBoard({
       ) : null}
 
       <TableContainer sx={tableShellSx}>
-        <Table size="small">
+        <Table>
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
@@ -321,7 +306,7 @@ export default function AdminUsersBoard({
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={sendInvite} disabled={loading || !email}>
             {loading ? "Sending…" : "Send invite"}
           </Button>
@@ -338,7 +323,7 @@ export default function AdminUsersBoard({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
+          <Button variant="outlined" onClick={() => setDeleteTarget(null)} disabled={deleting}>
             Cancel
           </Button>
           <Button color="error" variant="contained" onClick={removeUser} disabled={deleting}>
@@ -357,7 +342,7 @@ export default function AdminUsersBoard({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCancelInviteTarget(null)} disabled={cancellingInvite}>
+          <Button variant="outlined" onClick={() => setCancelInviteTarget(null)} disabled={cancellingInvite}>
             Keep invite
           </Button>
           <Button color="error" variant="contained" onClick={cancelInvite} disabled={cancellingInvite}>

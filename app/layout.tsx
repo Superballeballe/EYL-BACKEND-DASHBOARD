@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import ThemeRegistry from "@/components/ThemeRegistry";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+// The optical-size axis keeps 12–13px table text open and legible.
+const sans = DM_Sans({ subsets: ["latin"], axes: ["opsz"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "EYL Delivery Dashboard",
@@ -14,8 +15,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={geist.variable}>
-      <body className={geist.className}>
+    <html lang="en" className={sans.variable}>
+      <body className={sans.className}>
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>

@@ -1,6 +1,4 @@
-import Link from "next/link";
 import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
 import AutoRefresh from "@/components/AutoRefresh";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
 import DeliveriesFilters from "@/components/DeliveriesFilters";
@@ -129,42 +127,36 @@ export default async function DeliveriesPage({
           paymentStatus,
           fulfillmentStatus,
         }}
-      />
+      >
+        {deliveriesError ? (
+          <EmptyState message={`Could not load deliveries: ${deliveriesError.message}`} />
+        ) : appOrdersError ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Deliveries loaded, but app order status could not be loaded: {appOrdersError}
+          </Alert>
+        ) : null}
 
-      {deliveriesError ? (
-        <EmptyState message={`Could not load deliveries: ${deliveriesError.message}`} />
-      ) : appOrdersError ? (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Deliveries loaded, but app order status could not be loaded: {appOrdersError}
-        </Alert>
-      ) : null}
-
-      {!deliveriesError && rows.length === 0 ? (
-        <EmptyState
-          message={
-            hasFilters
-              ? "No deliveries match these filters. Try clearing filters or broadening your search."
-              : "No deliveries yet. Create your first booking to get started."
-          }
-        />
-      ) : !deliveriesError ? (
-        <>
-          <DeliveryTable
-            rows={rows}
-            knights={knights}
-            clients={clients}
-            rateTiers={rateTiers}
-            isAdmin={user?.role === "admin"}
+        {!deliveriesError && rows.length === 0 ? (
+          <EmptyState
+            message={
+              hasFilters
+                ? "No deliveries match these filters. Try clearing filters or broadening your search."
+                : "No deliveries yet. Create your first booking to get started."
+            }
           />
-          {total > LIMIT ? <DeliveriesPagination sp={sp} offset={offset} total={total} /> : null}
-        </>
-      ) : null}
-
-      {!deliveriesError && rows.length === 0 && hasFilters ? (
-        <Button component={Link} href="/deliveries" variant="outlined" sx={{ mt: 2 }}>
-          Clear all filters
-        </Button>
-      ) : null}
+        ) : !deliveriesError ? (
+          <>
+            <DeliveryTable
+              rows={rows}
+              knights={knights}
+              clients={clients}
+              rateTiers={rateTiers}
+              isAdmin={user?.role === "admin"}
+            />
+            {total > LIMIT ? <DeliveriesPagination sp={sp} offset={offset} total={total} /> : null}
+          </>
+        ) : null}
+      </DeliveriesFilters>
     </div>
   );
 }

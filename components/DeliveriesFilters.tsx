@@ -1,26 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useRef, useState } from "react";
-import {
-  Box,
-  Button,
-  Chip,
-  Divider,
-  FormControl,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Box, Button, InputAdornment, MenuItem, Select, Stack, TextField } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
+import { PageHeader } from "@/components/ui";
 import { todayISO } from "@/lib/format";
+import { panelSx } from "@/lib/surface";
 
 type KnightOpt = { id: string; display_name: string };
 
@@ -40,6 +27,8 @@ export type DeliveriesFiltersProps = {
   hasFilters: boolean;
   dateSummary?: string;
   action?: React.ReactNode;
+  /** The table (or its empty state), rendered under the toolbar. */
+  children?: React.ReactNode;
 };
 
 type DatePreset = "today" | "week" | "month" | "all";
@@ -76,12 +65,88 @@ function activePreset(from: string, to: string): DatePreset | null {
   return null;
 }
 
-const PRESETS: { id: DatePreset; label: string }[] = [
-  { id: "today", label: "Today" },
-  { id: "week", label: "Last 7 days" },
-  { id: "month", label: "This month" },
-  { id: "all", label: "All time" },
+const DATE_OPTIONS: { value: DatePreset | "custom"; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "This month" },
+  { value: "custom", label: "Custom range" },
 ];
+
+const PAYMENT_OPTIONS = [
+  { value: "", label: "Any payment" },
+  { value: "paid", label: "Paid" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "partial", label: "Partial" },
+  { value: "free", label: "Free" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Any status" },
+  { value: "booked", label: "Booked" },
+  { value: "accepted", label: "Accepted" },
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+/** Query-string name for each filter the deliveries page reads. */
+const PARAM: Record<keyof DeliveriesFilterValues, string> = {
+  q: "q",
+  from: "from",
+  to: "to",
+  knightId: "knight_id",
+  paymentStatus: "payment_status",
+  fulfillmentStatus: "status",
+};
+
+/** Toolbar controls are the theme's filled fields, drawn as pills. */
+const pillSx = { height: 36, borderRadius: "999px", fontSize: "0.8125rem" } as const;
+
+/** A dropdown that reads as a pill: the filter's name, then its value in bold once one is chosen. */
+function FilterPill({
+  label,
+  value,
+  unset = "",
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  /** The option that means "not filtering" — shown as the bare label. */
+  unset?: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select
+      size="small"
+      displayEmpty
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      inputProps={{ "aria-label": label }}
+      renderValue={(current) => (
+        <Box component="span" sx={{ display: "flex", gap: 0.75 }}>
+          <Box component="span" sx={{ color: "text.secondary" }}>
+            {label}
+          </Box>
+          {current !== unset ? (
+            <Box component="span" sx={{ fontWeight: 600 }}>
+              {options.find((option) => option.value === current)?.label ?? current}
+            </Box>
+          ) : null}
+        </Box>
+      )}
+      sx={pillSx}
+    >
+      {options.map((option) => (
+        <MenuItem key={option.value} value={option.value}>
+          {option.label}
+        </MenuItem>
+      ))}
+    </Select>
+  );
+}
 
 export default function DeliveriesFilters({
   values,
@@ -90,15 +155,11 @@ export default function DeliveriesFilters({
   hasFilters,
   dateSummary,
   action,
+  children,
 }: DeliveriesFiltersProps) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const [from, setFrom] = useState(values.from);
-  const [to, setTo] = useState(values.to);
-  const preset = activePreset(from, to);
-
-  const hasActiveFilters = Boolean(
-    values.q || values.from || values.to || values.knightId || values.paymentStatus || values.fulfillmentStatus,
-  );
+  const router = useRouter();
+  const preset = activePreset(values.from, values.to);
+  const [customRange, setCustomRange] = useState(preset === null);
 
   const summaryParts = [
     `${total} record${total === 1 ? "" : "s"}`,
@@ -106,189 +167,129 @@ export default function DeliveriesFilters({
     hasFilters ? "filtered" : null,
   ].filter(Boolean);
 
-  function applyPreset(next: DatePreset) {
-    const range = presetRange(next);
-    setFrom(range.from);
-    setTo(range.to);
-    queueMicrotask(() => formRef.current?.requestSubmit());
+  /** The URL is the source of truth: every change navigates to the new filter set, from page one. */
+  function apply(changes: Partial<DeliveriesFilterValues>) {
+    const next = { ...values, ...changes };
+    const params = new URLSearchParams();
+    for (const key of Object.keys(PARAM) as (keyof DeliveriesFilterValues)[]) {
+      if (next[key]) params.set(PARAM[key], next[key]);
+    }
+    const query = params.toString();
+    router.push(query ? `/deliveries?${query}` : "/deliveries");
   }
 
+  function onDateOption(option: string) {
+    if (option === "custom") {
+      setCustomRange(true);
+      return;
+    }
+    setCustomRange(false);
+    apply(presetRange(option as DatePreset));
+  }
+
+  const dateInputSx = { width: 150, "& .MuiFilledInput-root": pillSx } as const;
+
   return (
-    <Box
-      ref={formRef}
-      component="form"
-      method="get"
-      action="/deliveries"
-      sx={{
-        mb: 2.5,
-        borderRadius: 1,
-        border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "background.paper",
-        overflow: "hidden",
-      }}
-    >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{
-          p: 2,
-          alignItems: { sm: "center" },
-          justifyContent: "space-between",
-          bgcolor: "grey.50",
-        }}
-      >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h1">Deliveries</Typography>
-          <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
-            {summaryParts.join(" · ")}
-          </Typography>
-        </Box>
-        {action ? <Box sx={{ flexShrink: 0 }}>{action}</Box> : null}
-      </Stack>
+    <>
+      <PageHeader title="Deliveries" subtitle={summaryParts.join(" · ")} />
 
-      <Divider />
-
-      <Box sx={{ p: 2, pt: 1.5 }}>
-        <Typography
-          variant="overline"
-          sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: "0.06em", display: "block", mb: 1 }}
-        >
-          Find a delivery
-        </Typography>
-        <TextField
-          name="q"
-          size="small"
-          fullWidth
-          defaultValue={values.q}
-          placeholder="APPEYL-12, sender, recipient, pickup/drop address, invoice no…"
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                </InputAdornment>
-              ),
-            },
-          }}
-          sx={{ mt: 0 }}
-        />
-        <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: "text.secondary" }}>
-          Booking ID, names, locations, or invoice number
-        </Typography>
-      </Box>
-
-      <Divider />
-
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ ...panelSx, mb: 2.5 }}>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          component="form"
+          role="search"
+          direction="row"
           spacing={1}
-          sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mb: 1.5 }}
+          useFlexGap
+          onSubmit={(event) => {
+            event.preventDefault();
+            apply({ q: String(new FormData(event.currentTarget).get("q") ?? "").trim() });
+          }}
+          sx={{ p: 2, flexWrap: "wrap", alignItems: "center" }}
         >
-          <Typography
-            variant="overline"
-            sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: "0.06em", mb: 0 }}
-          >
-            Task date range
-          </Typography>
-          <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
-            {PRESETS.map(({ id, label }) => (
-              <Chip
-                key={id}
-                label={label}
+          <TextField
+            key={values.q}
+            name="q"
+            size="small"
+            defaultValue={values.q}
+            placeholder="Search ID, name, address, invoice…"
+            slotProps={{
+              htmlInput: { "aria-label": "Search by booking ID, names, locations, or invoice number" },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: "text.primary" }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{ width: { xs: "100%", sm: 280 }, "& .MuiFilledInput-root": pillSx }}
+          />
+
+          <FilterPill
+            label="Date"
+            unset="all"
+            value={customRange ? "custom" : (preset ?? "custom")}
+            options={DATE_OPTIONS}
+            onChange={onDateOption}
+          />
+          {customRange ? (
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+              <TextField
                 size="small"
-                clickable
-                variant={preset === id ? "filled" : "outlined"}
-                color={preset === id ? "primary" : "default"}
-                onClick={() => applyPreset(id)}
+                type="date"
+                value={values.from}
+                onChange={(event) => apply({ from: event.target.value })}
+                slotProps={{ htmlInput: { "aria-label": "Task date from" } }}
+                sx={dateInputSx}
               />
-            ))}
+              <ArrowForwardIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+              <TextField
+                size="small"
+                type="date"
+                value={values.to}
+                onChange={(event) => apply({ to: event.target.value })}
+                slotProps={{ htmlInput: { "aria-label": "Task date to" } }}
+                sx={dateInputSx}
+              />
+            </Stack>
+          ) : null}
+          <FilterPill
+            label="Status"
+            value={values.fulfillmentStatus}
+            options={STATUS_OPTIONS}
+            onChange={(fulfillmentStatus) => apply({ fulfillmentStatus })}
+          />
+          <FilterPill
+            label="Payment"
+            value={values.paymentStatus}
+            options={PAYMENT_OPTIONS}
+            onChange={(paymentStatus) => apply({ paymentStatus })}
+          />
+          <FilterPill
+            label="Knight"
+            value={values.knightId}
+            options={[{ value: "", label: "All knights" }, ...knights.map((k) => ({ value: k.id, label: k.display_name }))]}
+            onChange={(knightId) => apply({ knightId })}
+          />
+
+          <Stack direction="row" spacing={1} sx={{ ml: "auto", alignItems: "center" }}>
+            {hasFilters ? (
+              <Button
+                variant="text"
+                onClick={() => {
+                  setCustomRange(false);
+                  router.push("/deliveries");
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+            {action ? <Box sx={{ flexShrink: 0 }}>{action}</Box> : null}
           </Stack>
         </Stack>
-
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
-          <TextField
-            name="from"
-            size="small"
-            type="date"
-            label="From"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: { xs: "100%", sm: 160 } }}
-          />
-          <ArrowForwardIcon fontSize="small" sx={{ color: "text.disabled", display: { xs: "none", sm: "block" } }} />
-          <TextField
-            name="to"
-            size="small"
-            type="date"
-            label="To"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: { xs: "100%", sm: 160 } }}
-          />
-          <Typography variant="caption" sx={{ color: "text.secondary", flex: 1, minWidth: 140 }}>
-            Leave either end blank for open-ended ranges
-          </Typography>
-        </Stack>
       </Box>
 
-      <Divider />
-
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={1.5}
-        useFlexGap
-        sx={{ p: 2, flexWrap: "wrap", alignItems: { md: "flex-end" } }}
-      >
-        <FormControl size="small" sx={{ width: { xs: "100%", sm: 180 } }}>
-          <InputLabel id="del-knight-label">Knight</InputLabel>
-          <Select name="knight_id" labelId="del-knight-label" label="Knight" defaultValue={values.knightId}>
-            <MenuItem value="">All knights</MenuItem>
-            {knights.map((k) => (
-              <MenuItem key={k.id} value={k.id}>
-                {k.display_name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ width: { xs: "100%", sm: 150 } }}>
-          <InputLabel id="del-pay-label">Payment</InputLabel>
-          <Select name="payment_status" labelId="del-pay-label" label="Payment" defaultValue={values.paymentStatus}>
-            <MenuItem value="">Any payment</MenuItem>
-            <MenuItem value="paid">Paid</MenuItem>
-            <MenuItem value="unpaid">Unpaid</MenuItem>
-            <MenuItem value="partial">Partial</MenuItem>
-            <MenuItem value="free">Free</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ width: { xs: "100%", sm: 150 } }}>
-          <InputLabel id="del-status-label">Status</InputLabel>
-          <Select name="status" labelId="del-status-label" label="Status" defaultValue={values.fulfillmentStatus}>
-            <MenuItem value="">Any status</MenuItem>
-            <MenuItem value="booked">Booked</MenuItem>
-            <MenuItem value="accepted">Accepted</MenuItem>
-            <MenuItem value="active">Active</MenuItem>
-            <MenuItem value="completed">Completed</MenuItem>
-            <MenuItem value="cancelled">Cancelled</MenuItem>
-          </Select>
-        </FormControl>
-
-        <Stack direction="row" spacing={1} sx={{ ml: { md: "auto" }, width: { xs: "100%", md: "auto" } }}>
-          <Button type="submit" variant="contained" startIcon={<FilterListIcon />} sx={{ flex: { xs: 1, md: "none" } }}>
-            Search
-          </Button>
-          {hasActiveFilters ? (
-            <Button component={Link} href="/deliveries" variant="outlined" startIcon={<RestartAltIcon />}>
-              Reset
-            </Button>
-          ) : null}
-        </Stack>
-      </Stack>
-    </Box>
+      {children}
+    </>
   );
 }

@@ -147,7 +147,7 @@ export default function CouponsBoard({
         <EmptyState message="No coupons yet." />
       ) : (
         <TableContainer sx={tableShellSx}>
-          <Table size="small">
+          <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Code</TableCell>
@@ -200,7 +200,7 @@ export default function CouponsBoard({
       )}
 
       <Box sx={{ mt: 4 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
           Redemptions
         </Typography>
         {redemptions.length === 0 ? (
@@ -209,7 +209,7 @@ export default function CouponsBoard({
           </Typography>
         ) : (
           <TableContainer sx={tableShellSx}>
-            <Table size="small">
+            <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>Code</TableCell>
@@ -269,7 +269,7 @@ export default function CouponsBoard({
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
+          <Button variant="outlined" onClick={() => setDeleteTarget(null)} disabled={deleting}>
             Cancel
           </Button>
           <Button color="error" variant="contained" onClick={removeCoupon} disabled={deleting}>

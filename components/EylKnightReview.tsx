@@ -18,6 +18,8 @@ import {
 } from "@mui/material";
 import { formatWorkArea } from "@/lib/workAreas";
 import type { EylKnight } from "@/lib/types";
+import { SectionLabel } from "@/components/ui";
+import { panelSx } from "@/lib/surface";
 
 const DOC_LABELS: Record<string, string> = {
   aadhaar: "Aadhaar",
@@ -41,17 +43,6 @@ const STATUS_LABEL: Record<EylKnight["status"], string> = {
   approved: "Approved",
   rejected: "Rejected",
 };
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography
-      variant="overline"
-      sx={{ display: "block", color: "text.secondary", fontWeight: 700, letterSpacing: 0.6, mb: 0.75 }}
-    >
-      {children}
-    </Typography>
-  );
-}
 
 export default function EylKnightReview({
   applicant,
@@ -153,10 +144,7 @@ export default function EylKnightReview({
       <Box
         sx={{
           p: 2.5,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <Stack
@@ -165,7 +153,7 @@ export default function EylKnightReview({
           sx={{ alignItems: { sm: "flex-start" }, justifyContent: "space-between", mb: 2 }}
         >
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6">
               {applicant.name || "Unnamed applicant"}
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 0.75, flexWrap: "wrap" }}>
@@ -247,7 +235,7 @@ export default function EylKnightReview({
       </Box>
 
       <Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
+        <Typography variant="h2" sx={{ mb: 1.5 }}>
           Documents
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
@@ -259,10 +247,7 @@ export default function EylKnightReview({
                 sx={{
                   width: { xs: "100%", sm: 220 },
                   p: 1.5,
-                  borderRadius: 1,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "background.paper",
+                  ...panelSx,
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>

@@ -132,7 +132,7 @@ export default function PaymentReviewActions({ review }: { review: PaymentReview
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setMode(null)} disabled={busy}>
+          <Button variant="outlined" onClick={() => setMode(null)} disabled={busy}>
             Cancel
           </Button>
           <Button

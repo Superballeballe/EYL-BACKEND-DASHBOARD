@@ -25,7 +25,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
 import ClientForm from "@/components/ClientForm";
 import { EmptyState } from "@/components/ui";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 import type { Client } from "@/lib/types";
 
 export default function ClientsBoard({
@@ -58,10 +58,7 @@ export default function ClientsBoard({
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <TextField
@@ -115,7 +112,7 @@ export default function ClientsBoard({
                   </TableCell>
                   <TableCell sx={{ color: "text.secondary" }}>{c.phone ?? "—"}</TableCell>
                   <TableCell align="right">
-                    <Button component={Link} href={`/clients/${c.id}`} size="small">
+                    <Button component={Link} href={`/clients/${c.id}`} size="small" variant="outlined">
                       Edit
                     </Button>
                   </TableCell>

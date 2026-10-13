@@ -66,19 +66,7 @@ function OrderLink({ orderId, code }: { orderId: string | null; code: string | n
 
 function Empty({ message }: { message: string }) {
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: 160,
-        borderRadius: 1,
-        border: "1px dashed",
-        borderColor: "divider",
-      }}
-    >
-      <EmptyState message={message} compact />
-    </Box>
+    <EmptyState message={message} minHeight={160} />
   );
 }
 
@@ -289,7 +277,7 @@ export default function RefundsBoard(props: Props) {
         onChange={(_, v) => setTab(v)}
         variant="scrollable"
         allowScrollButtonsMobile
-        sx={{ mb: 3, borderBottom: 1, borderColor: "divider", minHeight: 44 }}
+        sx={{ mb: 2 }}
       >
         <Tab label="Refunds" />
         <Tab

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  Box,
   Chip,
   Table,
   TableBody,
@@ -26,25 +25,13 @@ export default function CancelledOrdersTable({
 }) {
   if (rows.length === 0) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 220,
-          borderRadius: 1,
-          border: `1px dashed`,
-          borderColor: "divider",
-        }}
-      >
-        <EmptyState message={emptyMessage} compact />
-      </Box>
+      <EmptyState message={emptyMessage} minHeight={220} />
     );
   }
 
   return (
     <TableContainer sx={{ ...tableShellSx, overflowX: "auto" }}>
-      <Table size="small">
+      <Table>
         <TableHead>
           <TableRow>
             <TableCell>Cancelled</TableCell>

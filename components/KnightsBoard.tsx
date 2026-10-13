@@ -28,7 +28,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import KnightForm from "@/components/KnightForm";
 import { EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 import type { Knight } from "@/lib/types";
 
 export default function KnightsBoard({ knights }: { knights: Knight[] }) {
@@ -55,10 +55,7 @@ export default function KnightsBoard({ knights }: { knights: Knight[] }) {
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap" }}>
@@ -136,7 +133,7 @@ export default function KnightsBoard({ knights }: { knights: Knight[] }) {
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    <Button component={Link} href={`/knights/${k.id}`} size="small">
+                    <Button component={Link} href={`/knights/${k.id}`} size="small" variant="outlined">
                       Open
                     </Button>
                   </TableCell>
