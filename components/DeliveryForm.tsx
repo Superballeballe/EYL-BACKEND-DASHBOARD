@@ -88,7 +88,7 @@ function Section({
       }
     >
       <h2
-        className={`text-sm font-bold uppercase tracking-wider text-[var(--muted-foreground)] ${
+        className={`text-sm font-semibold text-[var(--text)] ${
           isModal ? "mb-3" : "mb-4"
         }`}
       >
@@ -105,6 +105,24 @@ export type DeliveryFormHandle = {
   validateStep: (step: number) => Promise<boolean>;
   validateAllSteps: () => Promise<{ ok: boolean; firstInvalidStep: number | null }>;
 };
+
+/** The form's sections, in order — the index is the `wizardStep`. */
+export const DELIVERY_FORM_STEPS = ["Booking", "Route", "Assignment", "Payment", "Billing"] as const;
+
+/** Check every step, then submit the form; on an error, reports the first step that has one instead. */
+export async function submitDeliveryForm(
+  handle: DeliveryFormHandle | null,
+  formId: string,
+  onInvalidStep: (step: number) => void,
+) {
+  const result = await handle?.validateAllSteps();
+  if (!result?.ok) {
+    if (result?.firstInvalidStep != null) onInvalidStep(result.firstInvalidStep);
+    return;
+  }
+  const form = document.getElementById(formId);
+  if (form instanceof HTMLFormElement) form.requestSubmit();
+}
 
 const DeliveryForm = forwardRef<DeliveryFormHandle, {
   mode: "new" | "edit";

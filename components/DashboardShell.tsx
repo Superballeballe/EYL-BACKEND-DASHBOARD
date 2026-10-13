@@ -19,14 +19,13 @@ import {
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
 import DraftsIcon from "@mui/icons-material/Drafts";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DeliveryLifecycleActions from "@/components/DeliveryLifecycleActions";
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { DeliveryPreviewModal } from "@/components/DeliveryTable";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, FulfillmentBadge } from "@/components/ui";
 import RetryRefundButton from "@/components/RetryRefundButton";
 import { cancelledRefundPaise, formatPaise, refundStatusInfo } from "@/lib/refunds";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
@@ -34,7 +33,7 @@ import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
 import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
 import { formatDeliveryOrderId } from "@/lib/serial";
-import { gray, tableShellSx } from "@/lib/surface";
+import { FOCUS, gray, panelSx, shadow, tableShellSx } from "@/lib/surface";
 import type { CancelledOrder, Delivery, DraftOrder, WorkDay } from "@/lib/types";
 
 type KnightOpt = { id: string; display_name: string };
@@ -75,246 +74,176 @@ type Props = {
   charts: ChartBundle;
 };
 
-const ROW_ACCENT: Record<string, object> = {
-  booked: { boxShadow: "inset 4px 0 0 #2563eb" },
-  accepted: { boxShadow: "inset 4px 0 0 #3b82f6" },
-  active: { boxShadow: "inset 4px 0 0 #60a5fa" },
-  completed: { boxShadow: "inset 4px 0 0 #93c5fd" },
-  cancelled: { boxShadow: "inset 4px 0 0 #cbd5e1", opacity: 0.85 },
-};
+/** Space or Enter on the card itself opens it; keys pressed on the buttons inside are left alone. */
+function openOnKey(event: React.KeyboardEvent<HTMLElement>, open: () => void) {
+  if (event.target !== event.currentTarget) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  open();
+}
 
-function OrdersTable({
-  rows,
+function JobCard({
+  delivery: d,
   knights,
-  emptyMessage,
-  mode = "running",
+  mode,
   onPreview,
 }: {
-  rows: Delivery[];
+  delivery: Delivery;
   knights: KnightOpt[];
-  emptyMessage: string;
-  mode?: "pending" | "running";
+  mode: "pending" | "running";
   onPreview: (delivery: Delivery) => void;
 }) {
-  if (rows.length === 0) {
-    return (
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 200,
-          borderRadius: 1,
-          border: `1px dashed ${gray.border}`,
-          bgcolor: gray.surface,
-        }}
-      >
-        <EmptyState message={emptyMessage} compact />
-      </Box>
-    );
-  }
+  const stops = getDeliveryStops(d);
+  const stopSummary = formatStopRouteSummary(stops);
+  const recipients =
+    stops.length > 1
+      ? stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")
+      : (d.drop_recipient_name ?? "");
 
   return (
-    <TableContainer sx={{ ...tableShellSx, overflowX: "auto" }}>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Sender · route</TableCell>
-            {mode === "running" ? (
-              <TableCell sx={{ width: "7rem" }}>Knight</TableCell>
-            ) : null}
-            <TableCell sx={{ width: "4.5rem" }} align="right">
-              Fees
-            </TableCell>
-            <TableCell sx={{ width: mode === "running" ? "9rem" : "11.5rem", pr: 1 }} align="right">
-              Actions
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((d) => {
-            const stops = getDeliveryStops(d);
-            const stopSummary = formatStopRouteSummary(stops);
-            return (
-            <TableRow
-              key={d.id}
-              hover
-              tabIndex={0}
-              role="button"
-              aria-label={`Preview delivery for ${d.sender_name ?? "unknown sender"}`}
-              sx={{
-                cursor: "pointer",
-                "&:focus-visible": { bgcolor: "#eff6ff" },
-                ...(ROW_ACCENT[d.fulfillment_status] ?? {}),
-              }}
-              onClick={() => onPreview(d)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onPreview(d);
-              }}
-            >
-              <TableCell sx={{ verticalAlign: "top", py: 1.25 }}>
-                {mode === "pending" ? (
-                  <>
-                    <Typography variant="body2" color="primary" sx={{ fontWeight: 700 }}>
-                      {d.sender_name ?? "—"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.35 }}>
-                      {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
-                    </Typography>
-                    {stopSummary ? (
-                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-                        Pickup · {areaLabel(d.pickup_location)}
-                      </Typography>
-                    ) : null}
-                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.35 }}>
-                      {formatDeliveryOrderId(d)}
-                      {stops.length > 1
-                        ? stops.map((stop) => stop.contactName).filter(Boolean).length
-                          ? ` · ${stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")}`
-                          : ""
-                        : d.drop_recipient_name
-                          ? ` · ${d.drop_recipient_name}`
-                          : ""}
-                    </Typography>
-                    <DeliveryTaskBadges delivery={d} />
-                  </>
-                ) : (
-                  <>
-                    <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
-                      {d.sender_name ?? "—"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.25 }}>
-                      {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
-                    </Typography>
-                    {stopSummary ? (
-                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-                        Pickup · {areaLabel(d.pickup_location)}
-                      </Typography>
-                    ) : null}
-                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-                      {formatDeliveryOrderId(d)}
-                      {stops.length > 1
-                        ? stops.map((stop) => stop.contactName).filter(Boolean).length
-                          ? ` · ${stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")}`
-                          : ""
-                        : d.drop_recipient_name
-                          ? ` · ${d.drop_recipient_name}`
-                          : ""}
-                    </Typography>
-                    <DeliveryTaskBadges delivery={d} />
-                    {d.pickup_time_window ? (
-                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-                        Pickup {fmtDatetimeLocal(d.pickup_time_window)}
-                      </Typography>
-                    ) : null}
-                  </>
-                )}
-              </TableCell>
-              {mode === "running" ? (
-                <TableCell sx={{ verticalAlign: "top", pt: 1.5 }}>
-                  <Typography variant="body2">{d.knight_name ?? "—"}</Typography>
-                </TableCell>
-              ) : null}
-              <TableCell
-                align="right"
-                sx={{ verticalAlign: "top", pt: 1.5, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
-              >
-                {money(d.fees)}
-              </TableCell>
-              <TableCell align="right" sx={{ verticalAlign: "top", pt: 1, pr: 1 }} onClick={(e) => e.stopPropagation()}>
-                <DeliveryLifecycleActions
-                  delivery={d}
-                  knights={knights}
-                  compact
-                  variant={mode === "pending" ? "pending" : "running"}
-                  onEditFull={() => onPreview(d)}
-                />
-              </TableCell>
-            </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <Box
+      role="button"
+      tabIndex={0}
+      aria-label={`Preview delivery for ${d.sender_name ?? "unknown sender"}`}
+      onClick={() => onPreview(d)}
+      onKeyDown={(event) => openOnKey(event, () => onPreview(d))}
+      sx={{
+        ...panelSx,
+        p: 1.5,
+        cursor: "pointer",
+        transition: "box-shadow .15s",
+        "&:hover": { boxShadow: shadow.md },
+        "&:focus-visible": { outline: `2px solid ${FOCUS}`, outlineOffset: 1 },
+      }}
+    >
+      <Stack direction="row" spacing={1.5} sx={{ justifyContent: "space-between", alignItems: "baseline" }}>
+        <Typography variant="subtitle2" noWrap sx={{ minWidth: 0 }}>
+          {d.sender_name ?? "—"}
+        </Typography>
+        <Typography variant="subtitle2" sx={{ flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+          {money(d.fees)}
+        </Typography>
+      </Stack>
+      <Typography
+        variant="caption"
+        noWrap
+        sx={{
+          display: "block",
+          mt: 0.25,
+          color: "text.secondary",
+          fontWeight: 600,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+        }}
+      >
+        {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
+      </Typography>
+      {stopSummary ? (
+        <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+          Pickup · {areaLabel(d.pickup_location)}
+        </Typography>
+      ) : null}
+      <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+        {formatDeliveryOrderId(d)}
+        {recipients ? ` · ${recipients}` : ""}
+      </Typography>
+      <DeliveryTaskBadges delivery={d} />
+      {mode === "running" ? (
+        <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+          Knight · {d.knight_name ?? "—"}
+          {d.pickup_time_window ? ` · Pickup ${fmtDatetimeLocal(d.pickup_time_window)}` : ""}
+        </Typography>
+      ) : null}
+
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          mt: 1.25,
+          pt: 1.25,
+          borderTop: 1,
+          borderColor: "divider",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "default",
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <FulfillmentBadge status={d.fulfillment_status} />
+        <DeliveryLifecycleActions
+          delivery={d}
+          knights={knights}
+          compact
+          variant={mode}
+          onEditFull={() => onPreview(d)}
+        />
+      </Stack>
+    </Box>
   );
 }
 
-function OrdersPanel({
+function JobLane({
   title,
   subtitle,
-  icon,
-  count,
   countLabel,
   rows,
   knights,
   emptyMessage,
-  mode = "running",
+  mode,
   onPreview,
 }: {
   title: string;
   subtitle: string;
-  icon: React.ReactNode;
-  count: number;
   countLabel: string;
   rows: Delivery[];
   knights: KnightOpt[];
   emptyMessage: string;
-  mode?: "pending" | "running";
+  mode: "pending" | "running";
   onPreview: (delivery: Delivery) => void;
 }) {
   return (
-    <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", pb: 2 }}>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2, flexShrink: 0 }}
-        >
-          <Box>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              {icon}
-              <Typography variant="h2">{title}</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
-              {subtitle}
-            </Typography>
-          </Box>
-          <Chip variant="outlined" color="primary" label={`${count} ${countLabel}`} />
+    <Box
+      component="section"
+      aria-label={title}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: { xs: 200, lg: 420 },
+        p: 1,
+        borderRadius: 1,
+        bgcolor: gray.lane,
+      }}
+    >
+      <Box sx={{ px: 1, pt: 0.75, pb: 1.25 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Typography variant="h2">{title}</Typography>
+          <Chip size="small" label={`${rows.length} ${countLabel}`} />
         </Stack>
-        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <OrdersTable
-            rows={rows}
-            knights={knights}
-            emptyMessage={emptyMessage}
-            mode={mode}
-            onPreview={onPreview}
-          />
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+          {subtitle}
+        </Typography>
+      </Box>
+      {rows.length === 0 ? (
+        <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", px: 2, py: 4 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center" }}>
+            {emptyMessage}
+          </Typography>
         </Box>
-      </CardContent>
-    </Card>
+      ) : (
+        <Stack spacing={1}>
+          {rows.map((d) => (
+            <JobCard key={d.id} delivery={d} knights={knights} mode={mode} onPreview={onPreview} />
+          ))}
+        </Stack>
+      )}
+    </Box>
   );
 }
 
 function DraftOrdersTable({ rows, emptyMessage }: { rows: DraftOrder[]; emptyMessage: string }) {
   if (rows.length === 0) {
     return (
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 200,
-          borderRadius: 1,
-          border: `1px dashed ${gray.border}`,
-          bgcolor: gray.surface,
-        }}
-      >
-        <EmptyState message={emptyMessage} compact />
-      </Box>
+      <EmptyState message={emptyMessage} minHeight={200} />
     );
   }
 
@@ -369,20 +298,7 @@ function DraftOrdersTable({ rows, emptyMessage }: { rows: DraftOrder[]; emptyMes
 function RefundPendingTable({ rows, emptyMessage }: { rows: CancelledOrder[]; emptyMessage: string }) {
   if (rows.length === 0) {
     return (
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 200,
-          borderRadius: 1,
-          border: `1px dashed ${gray.border}`,
-          bgcolor: gray.surface,
-        }}
-      >
-        <EmptyState message={emptyMessage} compact />
-      </Box>
+      <EmptyState message={emptyMessage} minHeight={200} />
     );
   }
 
@@ -494,7 +410,6 @@ export default function DashboardShell(props: Props) {
   const draftCount = draftOrders.length;
   const runningCount = runningOrders.length;
   const refundCount = refundPendingOrders.length;
-  const bothEmpty = pendingCount === 0 && runningCount === 0;
 
   useEffect(() => {
     let debounce: ReturnType<typeof setTimeout> | null = null;
@@ -523,7 +438,7 @@ export default function DashboardShell(props: Props) {
         onChange={(_, v) => setTab(v)}
         variant="scrollable"
         allowScrollButtonsMobile
-        sx={{ mb: 3, borderBottom: 1, borderColor: "divider", minHeight: 44 }}
+        sx={{ mb: 2 }}
       >
         <Tab
           icon={<AssignmentIcon fontSize="small" />}
@@ -572,51 +487,34 @@ export default function DashboardShell(props: Props) {
       </Tabs>
 
       {tab === 0 && (
-        <Box>
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2.5,
-              gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
-              alignItems: "stretch",
-              minHeight: { lg: 360 },
-            }}
-          >
-            {bothEmpty ? (
-              <Card sx={{ gridColumn: "1 / -1" }}>
-                <CardContent sx={{ py: 6 }}>
-                  <EmptyState message="No pending or running jobs right now." />
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <OrdersPanel
-                  title="New jobs to approve"
-                  subtitle="Confirm paid app orders, then assign a knight"
-                  icon={<AssignmentIcon color="primary" fontSize="small" />}
-                  count={pendingCount}
-                  countLabel="pending"
-                  rows={pendingOrders}
-                  knights={knights}
-                  emptyMessage="No new jobs waiting for approval."
-                  mode="pending"
-                  onPreview={setSelectedDelivery}
-                />
-                <OrdersPanel
-                  title="Current running jobs"
-                  subtitle="Accepted or active — pickup through delivery"
-                  icon={<LocalShippingIcon color="primary" fontSize="small" />}
-                  count={runningCount}
-                  countLabel="running"
-                  rows={runningOrders}
-                  knights={knights}
-                  emptyMessage="No jobs currently running."
-                  mode="running"
-                  onPreview={setSelectedDelivery}
-                />
-              </>
-            )}
-          </Box>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2,
+            gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+            alignItems: "stretch",
+          }}
+        >
+          <JobLane
+            title="New jobs to approve"
+            subtitle="Confirm paid app orders, then assign a knight"
+            countLabel="pending"
+            rows={pendingOrders}
+            knights={knights}
+            emptyMessage="No new jobs waiting for approval."
+            mode="pending"
+            onPreview={setSelectedDelivery}
+          />
+          <JobLane
+            title="Current running jobs"
+            subtitle="Accepted or active — pickup through delivery"
+            countLabel="running"
+            rows={runningOrders}
+            knights={knights}
+            emptyMessage="No jobs currently running."
+            mode="running"
+            onPreview={setSelectedDelivery}
+          />
         </Box>
       )}
 

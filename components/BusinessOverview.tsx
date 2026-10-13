@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Alert,
-  Box,
-  Card,
-  CardContent,
-  Divider,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { BarChart } from "@mui/x-charts/BarChart";
+import { useState } from "react";
+import { Alert, Box, Card, Stack, Typography } from "@mui/material";
 import { LineChart } from "@mui/x-charts/LineChart";
+import CurrencyRupeeOutlinedIcon from "@mui/icons-material/CurrencyRupeeOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
+import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import { fmtDate, money } from "@/lib/format";
-import { chart, gray } from "@/lib/surface";
+import { chart, FOCUS, gray } from "@/lib/surface";
 import type { WorkDay } from "@/lib/types";
 
 export type MonthPoint = {
@@ -57,7 +54,6 @@ type Props = {
 
 const TONE = {
   default: "text.primary",
-  positive: "primary.main",
   danger: "error.main",
   warn: "warning.main",
 } as const;
@@ -70,70 +66,81 @@ function compactMoney(n: number): string {
   return money(n);
 }
 
-function OverviewSection({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
+/** A titled card whose figures sit side by side, split by hairlines. */
+function FigureCard({ title, columns, children }: { title: string; columns: number; children: React.ReactNode }) {
   return (
     <Card>
-      <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={0.5}
-          sx={{ justifyContent: "space-between", alignItems: { sm: "baseline" }, mb: 2 }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            {title}
-          </Typography>
-          {subtitle ? (
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              {subtitle}
-            </Typography>
-          ) : null}
-        </Stack>
+      <Typography variant="h2" sx={{ px: 2.5, py: 2 }}>
+        {title}
+      </Typography>
+      {/* The 1px gap over a divider-coloured ground draws the rules, however the grid wraps. */}
+      <Box
+        sx={{
+          display: "grid",
+          gap: "1px",
+          gridTemplateColumns: { xs: "1fr 1fr", lg: `repeat(${columns}, 1fr)` },
+          bgcolor: "divider",
+          borderTop: 1,
+          borderColor: "divider",
+        }}
+      >
         {children}
-      </CardContent>
+      </Box>
     </Card>
   );
 }
 
-function MetricTile({
+function Figure({
+  icon,
   label,
   value,
   hint,
   href,
   tone = "default",
+  quiet = false,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
   hint?: string;
   href?: string;
   tone?: Tone;
+  /** Nothing to report: the figure recedes to gray. */
+  quiet?: boolean;
 }) {
   const inner = (
     <Box
       sx={{
-        p: 1.5,
-        borderRadius: 1,
-        bgcolor: gray.surface,
         height: "100%",
+        p: 2.5,
+        bgcolor: "background.paper",
         transition: "background-color .15s",
-        ...(href ? { "&:hover": { bgcolor: gray.hover } } : null),
+        ...(href ? { "&:hover": { bgcolor: gray.surface } } : null),
       }}
     >
-      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 0.5 }}>
-        {label}
-      </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700, color: TONE[tone], lineHeight: 1.2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            flexShrink: 0,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "50%",
+            bgcolor: gray.hover,
+            color: "text.secondary",
+            "& svg": { fontSize: 16 },
+          }}
+        >
+          {icon}
+        </Box>
+        <Typography variant="subtitle2">{label}</Typography>
+      </Stack>
+      <Typography variant="h4" sx={{ mt: 2, color: quiet ? "text.secondary" : TONE[tone], fontVariantNumeric: "tabular-nums" }}>
         {value}
       </Typography>
       {hint ? (
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
           {hint}
         </Typography>
       ) : null}
@@ -142,7 +149,16 @@ function MetricTile({
 
   if (!href) return inner;
   return (
-    <Box component={Link} href={href} sx={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}>
+    <Box
+      component={Link}
+      href={href}
+      sx={{
+        display: "block",
+        color: "inherit",
+        textDecoration: "none",
+        "&:focus-visible": { outline: `2px solid ${FOCUS}`, outlineOffset: -2 },
+      }}
+    >
       {inner}
     </Box>
   );
@@ -173,21 +189,26 @@ function ChartEmpty({ message }: { message: string }) {
   );
 }
 
-function ChartHeader({ title, subtitle }: { title: string; subtitle: string }) {
+type MetricId = "revenue" | "deliveries" | "paid" | "unpaid";
+
+/** Each year-to-date measure, and the measure drawn in gray behind it for comparison (same unit only). */
+const METRICS: { id: MetricId; label: string; isMoney: boolean; against?: MetricId; empty: string }[] = [
+  { id: "revenue", label: "Revenue", isMoney: true, empty: "No revenue recorded yet this year." },
+  { id: "deliveries", label: "Deliveries", isMoney: false, empty: "No deliveries logged this year yet." },
+  { id: "paid", label: "Paid", isMoney: true, against: "unpaid", empty: "No payment data recorded this year yet." },
+  { id: "unpaid", label: "Unpaid", isMoney: true, against: "paid", empty: "No payment data recorded this year yet." },
+];
+
+function LegendKey({ color, label }: { color: string; label: string }) {
   return (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="h2">{title}</Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
-        {subtitle}
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+      <Box sx={{ width: 14, height: 2, borderRadius: 1, bgcolor: color }} />
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        {label}
       </Typography>
-    </Box>
+    </Stack>
   );
 }
-
-const axisSx = {
-  "& .MuiChartsAxis-line, & .MuiChartsAxis-tick": { stroke: gray.border },
-  "& .MuiChartsAxis-tickLabel": { fill: gray.muted, fontSize: 11 },
-};
 
 export default function BusinessOverview({
   viewDate,
@@ -200,252 +221,284 @@ export default function BusinessOverview({
   period,
   charts,
 }: Props) {
+  const [metricId, setMetricId] = useState<MetricId>("revenue");
   const months = charts.months;
   const labels = months.map((m) => m.label);
-  const cumulative = months.reduce<number[]>((acc, m) => {
-    acc.push((acc.length ? acc[acc.length - 1] : 0) + m.revenue);
-    return acc;
-  }, []);
+  const sum = (pick: (m: MonthPoint) => number) => months.reduce((total, m) => total + pick(m), 0);
+
+  const series: Record<MetricId, number[]> = {
+    revenue: months.map((m) => m.revenue),
+    deliveries: months.map((m) => m.deliveries),
+    paid: months.map((m) => m.paid),
+    unpaid: months.map((m) => m.unpaid),
+  };
+  const totals: Record<MetricId, number> = {
+    revenue: charts.ytdRevenue,
+    deliveries: charts.ytdDeliveries,
+    paid: sum((m) => m.paid),
+    unpaid: sum((m) => m.unpaid),
+  };
+
+  const metric = METRICS.find((m) => m.id === metricId) ?? METRICS[0];
+  const against = METRICS.find((m) => m.id === metric.against);
+  const format = (v: number | null) => (metric.isMoney ? money(v ?? 0) : `${Math.round(v ?? 0)}`);
+  const hasData = totals[metric.id] > 0 || series[metric.id].some((v) => v > 0) || Boolean(against && totals[against.id] > 0);
 
   const collectionRate =
     period.paidAmount + period.unpaidAmount > 0
       ? `${Math.round((period.paidAmount / (period.paidAmount + period.unpaidAmount)) * 100)}%`
       : "—";
 
-  const hasRevenueData = months.some((m) => m.revenue > 0) || charts.ytdRevenue > 0;
-  const hasDeliveryData = months.some((m) => m.deliveries > 0) || charts.ytdDeliveries > 0;
-  const hasPaymentData = months.some((m) => m.paid > 0 || m.unpaid > 0);
   const statusTotal = charts.statusBreakdown.reduce((s, x) => s + x.count, 0);
+  const statusMax = Math.max(1, ...charts.statusBreakdown.map((s) => s.count));
   const periodLabel = fmtDate(periodStart);
 
-  const countAxis = [{ tickNumber: 4, valueFormatter: (v: number | null) => String(Math.round(v ?? 0)) }];
-  const moneyAxis = [{ tickNumber: 4, valueFormatter: (v: number | null) => compactMoney(v ?? 0) }];
-
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2}>
       {workDay?.note ? (
         <Alert severity="info">
           <strong>Note:</strong> {workDay.note}
         </Alert>
       ) : null}
 
-      <OverviewSection title="Today" subtitle={fmtDate(viewDate)}>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", lg: "repeat(4, 1fr)" } }}>
-          <MetricTile label="Deliveries" value={deliveriesToday} href={`/deliveries?date=${viewDate}`} />
-          <MetricTile label="Revenue" value={money(revenueToday)} tone="positive" hint="Fees collected today" />
-          <MetricTile
-            label="Unpaid"
-            value={unpaidCount}
-            tone={unpaidCount ? "danger" : "default"}
-            href={unpaidCount ? `/deliveries?date=${viewDate}&payment_status=unpaid` : undefined}
-          />
-          <MetricTile
-            label="Needs review"
-            value={reviewCount}
-            tone={reviewCount ? "warn" : "default"}
-            href="/deliveries?needs_review=true"
-          />
-        </Box>
-      </OverviewSection>
+      <Stack direction="row" spacing={1} sx={{ px: 0.5, alignItems: "baseline", justifyContent: "space-between" }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
+          <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+            Performance
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {fmtDate(viewDate)}
+          </Typography>
+        </Stack>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          Period since {periodLabel}
+        </Typography>
+      </Stack>
 
-      <OverviewSection title={`Since ${periodLabel}`} subtitle="Period totals">
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(3, 1fr)" } }}>
-          <MetricTile
-            label="Paid amount"
-            value={money(period.paidAmount)}
-            tone="positive"
-            hint={`${period.paidCount} ${period.paidCount === 1 ? "delivery" : "deliveries"}`}
-            href={`/deliveries?payment_status=paid&from=${periodStart}`}
-          />
-          <MetricTile label="Collection rate" value={collectionRate} hint="Paid ÷ (paid + unpaid fees)" />
-          <MetricTile label="Deliveries" value={period.count} hint="Non-cancelled in period" />
-        </Box>
-      </OverviewSection>
+      <FigureCard title="Today" columns={4}>
+        <Figure
+          icon={<LocalShippingOutlinedIcon />}
+          label="Deliveries"
+          value={deliveriesToday}
+          quiet={!deliveriesToday}
+          hint="View today's deliveries"
+          href={`/deliveries?date=${viewDate}`}
+        />
+        <Figure
+          icon={<CurrencyRupeeOutlinedIcon />}
+          label="Revenue"
+          value={money(revenueToday)}
+          quiet={!revenueToday}
+          hint="Fees collected today"
+        />
+        <Figure
+          icon={<HourglassEmptyOutlinedIcon />}
+          label="Unpaid"
+          value={unpaidCount}
+          tone="danger"
+          quiet={!unpaidCount}
+          hint={unpaidCount ? "View unpaid deliveries" : "Nothing outstanding"}
+          href={unpaidCount ? `/deliveries?date=${viewDate}&payment_status=unpaid` : undefined}
+        />
+        <Figure
+          icon={<FactCheckOutlinedIcon />}
+          label="Needs review"
+          value={reviewCount}
+          tone="warn"
+          quiet={!reviewCount}
+          hint="Open the review list"
+          href="/deliveries?needs_review=true"
+        />
+      </FigureCard>
+
+      <FigureCard title={`Since ${periodLabel}`} columns={3}>
+        <Figure
+          icon={<CurrencyRupeeOutlinedIcon />}
+          label="Paid amount"
+          value={money(period.paidAmount)}
+          quiet={!period.paidAmount}
+          hint={`${period.paidCount} ${period.paidCount === 1 ? "delivery" : "deliveries"}`}
+          href={`/deliveries?payment_status=paid&from=${periodStart}`}
+        />
+        <Figure
+          icon={<PercentOutlinedIcon />}
+          label="Collection rate"
+          value={collectionRate}
+          quiet={collectionRate === "—"}
+          hint="Paid ÷ (paid + unpaid fees)"
+        />
+        <Figure
+          icon={<LocalShippingOutlinedIcon />}
+          label="Deliveries"
+          value={period.count}
+          quiet={!period.count}
+          hint="Non-cancelled in period"
+        />
+      </FigureCard>
 
       <Card>
-        <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            sx={{ justifyContent: "space-between", alignItems: { md: "flex-start" }, mb: 2 }}
+        <Stack direction="row" spacing={2} sx={{ px: 2.5, pt: 2, alignItems: "baseline", justifyContent: "space-between" }}>
+          <Typography variant="h2">
+            Year to date
+          </Typography>
+          <Typography
+            component={Link}
+            href={`/deliveries?from=${viewDate.slice(0, 4)}-01-01`}
+            variant="body2"
+            sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "text.primary", textDecoration: "underline" } }}
           >
-            <ChartHeader title="Year to date" subtitle="Revenue trend and cumulative total" />
-            <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap" }}>
-              <Box sx={{ px: 1.5, py: 1, borderRadius: 1, bgcolor: gray.surface, minWidth: 120 }}>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                  YTD revenue
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main" }}>
-                  {money(charts.ytdRevenue)}
-                </Typography>
-              </Box>
+            View this year&apos;s deliveries
+          </Typography>
+        </Stack>
+
+        <Stack direction="row" role="tablist" aria-label="Year-to-date measure" useFlexGap sx={{ px: 1.5, pt: 1.5, flexWrap: "wrap" }}>
+          {METRICS.map((m) => {
+            const selected = m.id === metric.id;
+            return (
               <Box
-                component={Link}
-                href={`/deliveries?from=${viewDate.slice(0, 4)}-01-01`}
+                key={m.id}
+                component="button"
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setMetricId(m.id)}
                 sx={{
-                  px: 1.5,
-                  py: 1,
-                  borderRadius: 1,
-                  bgcolor: gray.surface,
-                  minWidth: 120,
-                  textDecoration: "none",
-                  color: "inherit",
-                  "&:hover": { bgcolor: gray.hover },
+                  minWidth: 112,
+                  p: 1,
+                  border: "none",
+                  borderRadius: "8px",
+                  bgcolor: "transparent",
+                  color: selected ? "text.primary" : "#8a8a8a",
+                  font: "inherit",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: gray.surface },
+                  "&:focus-visible": { outline: `2px solid ${FOCUS}`, outlineOffset: 1 },
                 }}
               >
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                  YTD deliveries
+                <Typography variant="subtitle2" sx={{ color: selected ? "text.primary" : "text.secondary" }}>
+                  {m.label}
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {charts.ytdDeliveries}
+                <Typography variant="h4" sx={{ mt: 0.25, fontVariantNumeric: "tabular-nums" }}>
+                  {m.isMoney ? money(totals[m.id]) : totals[m.id]}
                 </Typography>
               </Box>
-            </Stack>
-          </Stack>
+            );
+          })}
+        </Stack>
 
-          <Divider sx={{ mb: 2 }} />
-
-          {!hasRevenueData ? (
-            <ChartEmpty message="No revenue recorded yet this year. Charts will appear once deliveries are logged." />
+        <Box sx={{ px: 1.5, pb: 2 }}>
+          {!hasData ? (
+            <Box sx={{ px: 1, pt: 2 }}>
+              <ChartEmpty message={metric.empty} />
+            </Box>
           ) : (
-            <LineChart
-              xAxis={[{ data: labels, scaleType: "point", tickLabelStyle: { fontSize: 11 } }]}
-              yAxis={moneyAxis}
-              series={[
-                {
-                  id: "monthly",
-                  label: "Monthly",
-                  data: months.map((m) => m.revenue),
-                  color: chart.light,
-                  area: true,
-                  showMark: true,
-                  valueFormatter: (v) => money(v ?? 0),
-                },
-                {
-                  id: "ytd",
-                  label: "Cumulative",
-                  data: cumulative,
-                  color: chart.main,
-                  showMark: true,
-                  valueFormatter: (v) => money(v ?? 0),
-                },
-              ]}
-              height={260}
-              margin={{ left: 56, right: 16, top: 16, bottom: 28 }}
-              grid={{ horizontal: true }}
-              sx={{
-                ...axisSx,
-                "& .MuiAreaElement-series-monthly": { fillOpacity: 0.2 },
-              }}
-            />
+            <>
+              <LineChart
+                xAxis={[{ data: labels, scaleType: "point", disableLine: true, disableTicks: true }]}
+                yAxis={[
+                  {
+                    disableLine: true,
+                    disableTicks: true,
+                    tickNumber: 4,
+                    valueFormatter: (v: number | null) => (metric.isMoney ? compactMoney(v ?? 0) : `${Math.round(v ?? 0)}`),
+                  },
+                ]}
+                series={[
+                  ...(against
+                    ? [
+                        {
+                          id: against.id,
+                          label: against.label,
+                          data: series[against.id],
+                          color: chart.context,
+                          curve: "monotoneX" as const,
+                          showMark: false,
+                          valueFormatter: format,
+                        },
+                      ]
+                    : []),
+                  {
+                    id: metric.id,
+                    label: metric.label,
+                    data: series[metric.id],
+                    color: chart.main,
+                    curve: "monotoneX" as const,
+                    showMark: false,
+                    valueFormatter: format,
+                  },
+                ]}
+                height={280}
+                margin={{ left: 8, right: 16, top: 16, bottom: 8 }}
+                grid={{ horizontal: true }}
+                hideLegend
+                sx={{
+                  "& .MuiChartsAxis-tickLabel": { fill: gray.muted, fontSize: 11 },
+                  "& .MuiChartsGrid-line": { stroke: gray.stripe },
+                  "& .MuiLineElement-root": { strokeWidth: 2 },
+                }}
+              />
+              {against ? (
+                <Stack direction="row" spacing={2} sx={{ px: 1, pt: 0.5 }}>
+                  <LegendKey color={chart.main} label={metric.label} />
+                  <LegendKey color={chart.context} label={against.label} />
+                </Stack>
+              ) : null}
+            </>
           )}
-        </CardContent>
+        </Box>
       </Card>
 
-      <Box
-        sx={{
-          display: "grid",
-          gap: 2,
-          gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
-          alignItems: "stretch",
-        }}
-      >
-        <Card sx={{ height: "100%" }}>
-          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-            <ChartHeader title="Monthly deliveries" subtitle="Volume by month" />
-            {!hasDeliveryData ? (
-              <ChartEmpty message="No deliveries logged this year yet." />
-            ) : (
-              <BarChart
-                xAxis={[{ data: labels, scaleType: "band", tickLabelStyle: { fontSize: 11 } }]}
-                yAxis={countAxis}
-                series={[
-                  {
-                    data: months.map((m) => m.deliveries),
-                    label: "Deliveries",
-                    color: chart.main,
-                    valueFormatter: (v) => `${v ?? 0}`,
-                  },
-                ]}
-                height={240}
-                margin={{ left: 44, right: 12, top: 12, bottom: 28 }}
-                grid={{ horizontal: true }}
-                borderRadius={4}
-                sx={axisSx}
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card sx={{ height: "100%" }}>
-          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-            <ChartHeader title="Paid vs unpaid" subtitle="Fees collected vs outstanding" />
-            {!hasPaymentData ? (
-              <ChartEmpty message="No payment data recorded this year yet." />
-            ) : (
-              <BarChart
-                xAxis={[{ data: labels, scaleType: "band", tickLabelStyle: { fontSize: 11 } }]}
-                yAxis={moneyAxis}
-                series={[
-                  {
-                    data: months.map((m) => m.paid),
-                    label: "Paid",
-                    color: chart.main,
-                    stack: "pay",
-                    valueFormatter: (v) => money(v ?? 0),
-                  },
-                  {
-                    data: months.map((m) => m.unpaid),
-                    label: "Unpaid",
-                    color: chart.soft,
-                    stack: "pay",
-                    valueFormatter: (v) => money(v ?? 0),
-                  },
-                ]}
-                height={240}
-                margin={{ left: 52, right: 12, top: 12, bottom: 28 }}
-                grid={{ horizontal: true }}
-                borderRadius={4}
-                sx={axisSx}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </Box>
-
       <Card>
-        <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-          <ChartHeader title="Fulfillment mix" subtitle="Deliveries by status (YTD)" />
-          {statusTotal === 0 ? (
+        <Stack direction="row" spacing={2} sx={{ px: 2.5, pt: 2, pb: 1, alignItems: "baseline", justifyContent: "space-between" }}>
+          <Typography variant="h2">
+            Fulfillment mix
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Deliveries by status, year to date
+          </Typography>
+        </Stack>
+        {statusTotal === 0 ? (
+          <Box sx={{ px: 2.5, pb: 2.5 }}>
             <ChartEmpty message="No fulfillment status breakdown available yet." />
-          ) : (
-            <BarChart
-              layout="horizontal"
-              yAxis={[
-                {
-                  data: charts.statusBreakdown.map((s) => s.status),
-                  scaleType: "band",
-                  width: 96,
-                  tickLabelStyle: { fontSize: 12 },
-                },
-              ]}
-              xAxis={countAxis}
-              series={[
-                {
-                  data: charts.statusBreakdown.map((s) => s.count),
-                  label: "Orders",
-                  color: chart.main,
-                  valueFormatter: (v) => `${Math.round(v ?? 0)}`,
-                },
-              ]}
-              height={Math.min(280, Math.max(180, charts.statusBreakdown.length * 40 + 64))}
-              margin={{ left: 8, right: 16, top: 8, bottom: 24 }}
-              grid={{ vertical: true }}
-              borderRadius={4}
-              sx={axisSx}
-            />
-          )}
-        </CardContent>
+          </Box>
+        ) : (
+          <Box sx={{ px: 2.5, pb: 1 }}>
+            {charts.statusBreakdown.map((row) => (
+              <Box
+                key={row.status}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(88px, 140px) 1fr 48px 48px",
+                  alignItems: "center",
+                  gap: 2,
+                  py: 1.25,
+                  borderTop: 1,
+                  borderColor: gray.stripe,
+                }}
+              >
+                <Typography variant="subtitle2">{row.status}</Typography>
+                <Box sx={{ height: 8 }}>
+                  <Box
+                    sx={{
+                      height: "100%",
+                      width: `${(row.count / statusMax) * 100}%`,
+                      minWidth: row.count ? 4 : 0,
+                      borderRadius: "0 4px 4px 0",
+                      bgcolor: chart.main,
+                    }}
+                  />
+                </Box>
+                <Typography variant="body2" sx={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  {row.count}
+                </Typography>
+                <Typography variant="body2" sx={{ textAlign: "right", color: "text.secondary", fontVariantNumeric: "tabular-nums" }}>
+                  {Math.round((row.count / statusTotal) * 100)}%
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
       </Card>
     </Stack>
   );

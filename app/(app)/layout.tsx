@@ -11,10 +11,11 @@ export default async function AppLayout({
   const reviewCount = await countOpenPaymentReviews().catch(() => 0);
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="grid min-h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_1fr] bg-[var(--background)]">
+      {/* Nav renders two grid items: the top bar across both columns, then the sidebar. */}
       <Nav user={{ email: user.email, name: user.name, role: user.role }} reviewCount={reviewCount} />
-      <main className="min-w-0 flex-1 bg-[var(--background)]">
-        <div className="mx-auto max-w-[104rem] px-6 py-7">{children}</div>
+      <main className="min-w-0 bg-[var(--background)]">
+        <div className="mx-auto max-w-[104rem] px-6 py-5">{children}</div>
       </main>
     </div>
   );

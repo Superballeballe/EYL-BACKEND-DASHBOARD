@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Form from "next/form";
 import {
-  Avatar,
   Badge,
   Box,
   Divider,
@@ -12,6 +12,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -26,35 +28,60 @@ import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
+import MenuIcon from "@mui/icons-material/Menu";
+import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import PhoneInTalkOutlinedIcon from "@mui/icons-material/PhoneInTalkOutlined";
+import SearchIcon from "@mui/icons-material/Search";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
-import { gray } from "@/lib/surface";
+import { chrome, CONTROL_RADIUS, gray, ink, RADIUS } from "@/lib/surface";
 
 const SIDEBAR_STORAGE_KEY = "eyl-sidebar-collapsed";
-const EXPANDED_W = 224;
-const COLLAPSED_W = 72;
+const TOPBAR_H = 56;
+const EXPANDED_W = 240;
+const COLLAPSED_W = 60;
+const CONTROL = `${CONTROL_RADIUS}px`;
+/** The frame's rounded top corners: quarter-circle cut-outs hanging off the top bar. */
+const cornerMask = (side: "left" | "right") =>
+  `radial-gradient(circle at ${side === "left" ? "100%" : "0"} 100%, transparent ${RADIUS}px, ${chrome.bar} ${RADIUS + 0.5}px)`;
 
-const LINKS = [
-  { href: "/", label: "Dashboard", Icon: DashboardOutlinedIcon },
-  { href: "/deliveries", label: "Deliveries", Icon: LocalShippingOutlinedIcon },
-  { href: "/cancelled-orders", label: "Cancelled orders", Icon: CancelOutlinedIcon },
-  { href: "/refunds", label: "Refunds", Icon: CurrencyRupeeOutlinedIcon },
-  { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
-  { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
-  { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
-  { href: "/eyl-knights", label: "Approve new knights", Icon: TwoWheelerOutlinedIcon },
-  { href: "/salaries", label: "Salaries", Icon: BadgeOutlinedIcon },
-  { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
-  { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
-  { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
-  { href: "/hub-contacts", label: "Customer care", Icon: PhoneInTalkOutlinedIcon },
-  { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
-] as const;
+type NavLink = { href: string; label: string; Icon: typeof DashboardOutlinedIcon; adminOnly?: boolean };
 
-const ADMIN_LINKS = [{ href: "/admin/users", label: "Team", Icon: ManageAccountsOutlinedIcon }] as const;
+const SECTIONS: { title: string; links: NavLink[] }[] = [
+  {
+    title: "Operations",
+    links: [
+      { href: "/", label: "Dashboard", Icon: DashboardOutlinedIcon },
+      { href: "/deliveries", label: "Deliveries", Icon: LocalShippingOutlinedIcon },
+      { href: "/cancelled-orders", label: "Cancelled orders", Icon: CancelOutlinedIcon },
+      { href: "/refunds", label: "Refunds", Icon: CurrencyRupeeOutlinedIcon },
+      { href: "/map", label: "Plotting map", Icon: MapOutlinedIcon },
+      { href: "/lineup", label: "Daily Lineup", Icon: CalendarMonthOutlinedIcon },
+    ],
+  },
+  {
+    title: "People",
+    links: [
+      { href: "/knights", label: "Knights", Icon: ShieldOutlinedIcon },
+      { href: "/eyl-knights", label: "Approve new knights", Icon: TwoWheelerOutlinedIcon },
+      { href: "/salaries", label: "Salaries", Icon: BadgeOutlinedIcon },
+      { href: "/clients", label: "Clients", Icon: PeopleOutlinedIcon },
+    ],
+  },
+  {
+    title: "Setup",
+    links: [
+      { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
+      { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
+      { href: "/hub-contacts", label: "Customer care", Icon: PhoneInTalkOutlinedIcon },
+      { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
+      { href: "/admin/users", label: "Team", Icon: ManageAccountsOutlinedIcon, adminOnly: true },
+    ],
+  },
+];
 
 const linkSx = {
   textDecoration: "none",
@@ -64,21 +91,37 @@ const linkSx = {
 
 const navItemSx = (active: boolean) => ({
   mb: 0.5,
-  borderRadius: 1,
-  minHeight: 40,
-  px: 1.5,
+  borderRadius: CONTROL,
+  minHeight: 28,
+  py: 0.5,
+  px: 1,
+  color: "text.primary",
+  "& .MuiListItemIcon-root": { color: active ? "text.primary" : ink.icon },
   ...(active
-    ? {
-        bgcolor: "#eff6ff",
-        color: "primary.main",
-        "& .MuiListItemIcon-root": { color: "primary.main" },
-        "&:hover": { bgcolor: "#dbeafe" },
-      }
-    : {
-        color: "text.primary",
-        "& .MuiListItemIcon-root": { color: "text.secondary" },
-        "&:hover": { bgcolor: gray.hover },
-      }),
+    ? { "&, &.Mui-selected, &:hover, &.Mui-selected:hover": { bgcolor: "#fafafa" } }
+    : { "&:hover": { bgcolor: gray.hover } }),
+});
+
+const navIconSx = (collapsed: boolean) => ({
+  minWidth: 20,
+  mr: collapsed ? 0 : 1,
+  justifyContent: "center",
+  "& svg": { fontSize: 18 },
+});
+
+/** The label fades and gives up its width as the sidebar collapses to icons. */
+const navTextSx = (collapsed: boolean, mounted: boolean, active: boolean) => ({
+  flex: collapsed ? "0 0 0px" : "1 1 auto",
+  opacity: collapsed ? 0 : 1,
+  overflow: "hidden",
+  m: 0,
+  transition: mounted ? "opacity 0.12s ease, flex-basis 0.15s ease" : "none",
+  "& .MuiListItemText-primary": {
+    fontSize: "0.8125rem",
+    lineHeight: "20px",
+    fontWeight: active ? 600 : 500,
+    whiteSpace: "nowrap",
+  },
 });
 
 function NavItem({
@@ -93,7 +136,7 @@ function NavItem({
   badge?: number;
   href: string;
   label: string;
-  Icon: (typeof LINKS)[number]["Icon"] | (typeof ADMIN_LINKS)[number]["Icon"];
+  Icon: NavLink["Icon"];
   active: boolean;
   collapsed: boolean;
   mounted: boolean;
@@ -108,32 +151,32 @@ function NavItem({
         sx={navItemSx(active)}
         aria-label={collapsed ? label : undefined}
       >
-        <ListItemIcon sx={{ minWidth: 36, justifyContent: "center" }}>
-          <Badge
-            color="warning"
-            badgeContent={badge}
-            invisible={badge <= 0}
-            max={99}
-            aria-label={badge > 0 ? `${badge} need review` : undefined}
-          >
+        <ListItemIcon sx={navIconSx(collapsed)}>
+          <Badge color="warning" variant="dot" invisible={!collapsed || badge <= 0}>
             <Icon fontSize="small" />
           </Badge>
         </ListItemIcon>
-        <ListItemText
-          primary={label}
-          sx={{
-            flex: collapsed ? "0 0 0px" : "1 1 auto",
-            opacity: collapsed ? 0 : 1,
-            overflow: "hidden",
-            m: 0,
-            transition: mounted ? "opacity 0.12s ease, flex-basis 0.15s ease" : "none",
-            "& .MuiListItemText-primary": {
-              typography: "body2",
-              fontWeight: active ? 600 : 500,
-              whiteSpace: "nowrap",
-            },
-          }}
-        />
+        <ListItemText primary={label} sx={navTextSx(collapsed, mounted, active)} />
+        {badge > 0 && !collapsed ? (
+          <Box
+            component="span"
+            aria-label={`${badge} need review`}
+            sx={{
+              ml: 1,
+              px: 0.75,
+              minWidth: 20,
+              textAlign: "center",
+              borderRadius: CONTROL,
+              bgcolor: "rgba(0, 0, 0, 0.08)",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 500,
+              lineHeight: "20px",
+            }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </Box>
+        ) : null}
       </ListItemButton>
     </Link>
   );
@@ -167,6 +210,7 @@ export default function Nav({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
@@ -187,206 +231,308 @@ export default function Nav({
   }
 
   async function logout() {
+    setMenuAnchor(null);
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
   }
 
   const profileActive = isActive("/profile");
+  const menuOpen = Boolean(menuAnchor);
+  const displayName = user.name || user.email;
 
-  const profileLink = (
-    <Link href="/profile" prefetch style={linkSx} aria-label="Profile">
+  return (
+    <>
       <Box
+        component="header"
         sx={{
+          gridColumn: "1 / -1",
+          position: "sticky",
+          top: 0,
+          zIndex: "appBar",
+          height: TOPBAR_H,
           display: "flex",
           alignItems: "center",
-          gap: 1,
-          px: collapsed ? 0.75 : 1.5,
-          py: 1,
-          mx: collapsed ? 0 : 0,
-          borderRadius: 1,
-          minHeight: 40,
-          justifyContent: collapsed ? "center" : "flex-start",
-          ...(profileActive
-            ? {
-                bgcolor: "#eff6ff",
-                color: "primary.main",
-                "& .MuiTypography-root": { color: profileActive ? "inherit" : undefined },
-              }
-            : { "&:hover": { bgcolor: gray.hover } }),
+          gap: 2,
+          px: 1.5,
+          bgcolor: chrome.bar,
+          color: chrome.text,
+          "&::before, &::after": {
+            content: '""',
+            position: "absolute",
+            top: "100%",
+            width: RADIUS,
+            height: RADIUS,
+            pointerEvents: "none",
+          },
+          "&::before": { left: 0, background: cornerMask("left") },
+          "&::after": { right: 0, background: cornerMask("right") },
         }}
       >
-        <Avatar
-          sx={{
-            width: 32,
-            height: 32,
-            flexShrink: 0,
-            bgcolor: "primary.main",
-            fontSize: "0.7rem",
-            fontWeight: 700,
-          }}
-        >
-          {userInitials(user.name, user.email)}
-        </Avatar>
-        {!collapsed ? (
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography
-              variant="body2"
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1.25 }}>
+          <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <Box
+              component="button"
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
               sx={{
+                width: 32,
+                height: 32,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 0,
+                border: "none",
+                borderRadius: CONTROL,
+                bgcolor: "transparent",
+                color: chrome.text,
+                cursor: "pointer",
+                transition: "background-color 0.15s ease",
+                "&:hover": { bgcolor: chrome.control },
+                "&:focus-visible": { outline: `2px solid ${chrome.muted}`, outlineOffset: 2 },
+              }}
+            >
+              {collapsed ? <MenuIcon sx={{ fontSize: 20 }} /> : <MenuOpenIcon sx={{ fontSize: 20 }} />}
+            </Box>
+          </Tooltip>
+          <Box
+            component={Link}
+            href="/"
+            aria-label="EYL Delivery — dashboard"
+            sx={{
+              width: 36,
+              height: 28,
+              flexShrink: 0,
+              borderRadius: CONTROL,
+              bgcolor: "#fff",
+              color: chrome.bar,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              textDecoration: "none",
+              "&:focus-visible": { outline: `2px solid ${chrome.muted}`, outlineOffset: 2 },
+            }}
+          >
+            EYL
+          </Box>
+          <Typography
+            sx={{
+              display: { xs: "none", sm: "block" },
+              color: "#fff",
+              fontSize: "0.9375rem",
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            EYL Delivery
+          </Typography>
+          <Box
+            component="span"
+            sx={{
+              display: { xs: "none", md: "block" },
+              px: 0.75,
+              border: `1px solid ${chrome.border}`,
+              borderRadius: "6px",
+              fontSize: "0.6875rem",
+              fontWeight: 500,
+              lineHeight: "18px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Operations
+          </Box>
+        </Box>
+
+        <Box sx={{ flex: "0 1 480px", minWidth: 0 }}>
+          <Form action="/deliveries" role="search">
+            <Box
+              component="label"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                height: 32,
+                px: 1.25,
+                borderRadius: CONTROL,
+                border: `1px solid ${chrome.border}`,
+                bgcolor: chrome.control,
+                color: chrome.muted,
+                cursor: "text",
+                "&:focus-within": { borderColor: chrome.muted },
+              }}
+            >
+              <SearchIcon sx={{ fontSize: 16 }} />
+              <Box
+                component="input"
+                type="search"
+                name="q"
+                placeholder="Search deliveries"
+                aria-label="Search deliveries"
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  p: 0,
+                  border: "none",
+                  outline: "none",
+                  bgcolor: "transparent",
+                  color: chrome.text,
+                  font: "inherit",
+                  fontSize: "0.8125rem",
+                  "&::placeholder": { color: chrome.muted, opacity: 1 },
+                }}
+              />
+            </Box>
+          </Form>
+        </Box>
+
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>
+          <Box
+            component="button"
+            type="button"
+            onClick={(event) => setMenuAnchor(event.currentTarget)}
+            aria-label={`Account menu for ${displayName}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              minWidth: 0,
+              height: 36,
+              pl: 0.5,
+              pr: { xs: 0.5, md: 1 },
+              border: "none",
+              borderRadius: CONTROL,
+              bgcolor: profileActive || menuOpen ? chrome.control : "transparent",
+              color: chrome.text,
+              cursor: "pointer",
+              font: "inherit",
+              fontSize: "0.8125rem",
+              fontWeight: 500,
+              transition: "background-color 0.15s ease",
+              "&:hover": { bgcolor: chrome.control },
+              "&:focus-visible": { outline: `2px solid ${chrome.muted}`, outlineOffset: 2 },
+            }}
+          >
+            <Box
+              component="span"
+              sx={{
+                width: 28,
+                height: 28,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: CONTROL,
+                bgcolor: "#36d3bd",
+                color: chrome.bar,
+                fontSize: "0.7rem",
                 fontWeight: 600,
-                lineHeight: 1.25,
+              }}
+            >
+              {userInitials(user.name, user.email)}
+            </Box>
+            <Box
+              component="span"
+              sx={{
+                display: { xs: "none", md: "block" },
+                maxWidth: 200,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
             >
-              {user.name || user.email}
-            </Typography>
-            {user.name ? (
-              <Typography
-                variant="caption"
-                sx={{
-                  color: profileActive ? "primary.main" : "text.secondary",
-                  opacity: profileActive ? 0.85 : 1,
-                  display: "block",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {user.email}
-              </Typography>
-            ) : null}
+              {displayName}
+            </Box>
           </Box>
-        ) : null}
+          <Menu
+            anchorEl={menuAnchor}
+            open={menuOpen}
+            onClose={() => setMenuAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{ paper: { sx: { mt: 0.5, minWidth: 220 } } }}
+          >
+            <MenuItem component={Link} href="/profile" selected={profileActive} onClick={() => setMenuAnchor(null)}>
+              <ListItemIcon>
+                <PersonOutlineOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Profile"
+                secondary={user.email}
+                slotProps={{
+                  primary: { sx: { fontSize: "0.8125rem", fontWeight: 500 } },
+                  secondary: { sx: { fontSize: "0.75rem" }, noWrap: true },
+                }}
+              />
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={logout}>
+              <ListItemIcon>
+                <LogoutOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Sign out" slotProps={{ primary: { sx: { fontSize: "0.8125rem", fontWeight: 500 } } }} />
+            </MenuItem>
+          </Menu>
+        </Box>
       </Box>
-    </Link>
-  );
 
-  const signOutButton = (
-    <ListItemButton onClick={logout} sx={navItemSx(false)}>
-      <ListItemIcon sx={{ minWidth: 36, justifyContent: "center" }}>
-        <LogoutOutlinedIcon fontSize="small" />
-      </ListItemIcon>
-      <ListItemText
-        primary="Sign out"
-        sx={{
-          flex: collapsed ? "0 0 0px" : "1 1 auto",
-          opacity: collapsed ? 0 : 1,
-          overflow: "hidden",
-          m: 0,
-          transition: mounted ? "opacity 0.12s ease, flex-basis 0.15s ease" : "none",
-          "& .MuiListItemText-primary": { typography: "body2", fontWeight: 500, whiteSpace: "nowrap" },
-        }}
-      />
-    </ListItemButton>
-  );
-
-  return (
-    <Box
-      component="aside"
-      sx={{
-        position: "sticky",
-        top: 0,
-        flexShrink: 0,
-        width: collapsed ? COLLAPSED_W : EXPANDED_W,
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        borderRight: `1px solid ${gray.border}`,
-        bgcolor: "#fff",
-        overflow: "hidden",
-        transition: mounted ? "width 0.15s ease" : "none",
-      }}
-    >
       <Box
+        component="aside"
         sx={{
+          position: "sticky",
+          top: TOPBAR_H,
+          alignSelf: "start",
+          width: collapsed ? COLLAPSED_W : EXPANDED_W,
+          height: `calc(100vh - ${TOPBAR_H}px)`,
           display: "flex",
-          alignItems: "center",
-          gap: 1,
-          px: collapsed ? 1 : 1.5,
-          py: 2,
-          borderBottom: `1px solid ${gray.border}`,
-          minHeight: 68,
-          justifyContent: collapsed ? "center" : "flex-start",
+          flexDirection: "column",
+          bgcolor: gray.sidebar,
+          overflow: "hidden",
+          transition: mounted ? "width 0.15s ease" : "none",
         }}
       >
-        <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement="right">
-          <Box
-            component="button"
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            sx={{
-              width: 36,
-              height: 36,
-              flexShrink: 0,
-              borderRadius: 1,
-              bgcolor: "primary.main",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "0.68rem",
-              fontWeight: 800,
-              letterSpacing: "0.04em",
-              p: 0,
-              fontFamily: "inherit",
-              transition: "background-color 0.15s ease",
-              "&:hover": { bgcolor: "primary.dark" },
-            }}
-          >
-            EYL
-          </Box>
-        </Tooltip>
-
-        {!collapsed ? (
-          <Box sx={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap" }}>
-              EYL Delivery
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-              Operations
-            </Typography>
-          </Box>
-        ) : null}
+        <Box component="nav" aria-label="Main" sx={{ p: 1.5, flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          {SECTIONS.map(({ title, links }, index) => (
+            <Box key={title} sx={{ mt: index === 0 ? 0 : 1.5 }}>
+              {collapsed ? (
+                index > 0 ? <Divider sx={{ mb: 1 }} /> : null
+              ) : (
+                <Typography
+                  variant="caption"
+                  sx={{ display: "block", px: 1, mb: 0.5, color: "text.secondary", fontWeight: 500, whiteSpace: "nowrap" }}
+                >
+                  {title}
+                </Typography>
+              )}
+              <List dense disablePadding component="ul">
+                {links
+                  .filter((link) => !link.adminOnly || user.role === "admin")
+                  .map(({ href, label, Icon }) => (
+                    <Box key={href} component="li" sx={{ listStyle: "none" }}>
+                      <NavItem
+                        href={href}
+                        label={label}
+                        Icon={Icon}
+                        active={isActive(href)}
+                        collapsed={collapsed}
+                        mounted={mounted}
+                        badge={href === "/refunds" ? reviewCount : 0}
+                      />
+                    </Box>
+                  ))}
+              </List>
+            </Box>
+          ))}
+        </Box>
       </Box>
-
-      <List dense disablePadding sx={{ px: 1, py: 1.5, flex: 1 }} component="ul">
-        {[...LINKS, ...(user.role === "admin" ? ADMIN_LINKS : [])].map(({ href, label, Icon }) => (
-          <Box key={href} component="li" sx={{ listStyle: "none" }}>
-            <NavItem
-              href={href}
-              label={label}
-              Icon={Icon}
-              active={isActive(href)}
-              collapsed={collapsed}
-              mounted={mounted}
-              badge={href === "/refunds" ? reviewCount : 0}
-            />
-          </Box>
-        ))}
-      </List>
-
-      <Box sx={{ px: collapsed ? 1 : 0.5, pb: 1.5, pt: 0.5 }}>
-        <Divider sx={{ mb: 1 }} />
-        {collapsed ? (
-          <Tooltip title={`${user.name || user.email} · Profile`} placement="right" disableInteractive enterDelay={400}>
-            {profileLink}
-          </Tooltip>
-        ) : (
-          profileLink
-        )}
-        {collapsed ? (
-          <Tooltip title="Sign out" placement="right" disableInteractive enterDelay={400}>
-            {signOutButton}
-          </Tooltip>
-        ) : (
-          signOutButton
-        )}
-      </Box>
-    </Box>
+    </>
   );
 }

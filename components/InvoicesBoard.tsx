@@ -27,7 +27,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { EmptyState } from "@/components/ui";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { fmtDateTime, money } from "@/lib/format";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 import type { AppInvoice } from "@/lib/types";
 
 const SELLER_GSTIN = "27AAECE3280H1ZO";
@@ -123,14 +123,11 @@ export default function InvoicesBoard({ invoices }: { invoices: AppInvoice[] }) 
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
             Source: Supabase <code>public.invoices</code>
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
@@ -167,7 +164,7 @@ export default function InvoicesBoard({ invoices }: { invoices: AppInvoice[] }) 
         <EmptyState message="No invoices match this filter." />
       ) : (
         <TableContainer sx={tableShellSx}>
-          <Table size="small">
+          <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Invoice #</TableCell>

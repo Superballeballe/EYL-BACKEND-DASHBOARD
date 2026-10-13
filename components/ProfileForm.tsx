@@ -82,13 +82,13 @@ export default function ProfileForm({ user }: { user: ProfileUser }) {
               height: 56,
               bgcolor: "primary.main",
               fontSize: "1.1rem",
-              fontWeight: 700,
+              fontWeight: 600,
             }}
           >
             {initials(user.name, user.email)}
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+            <Typography variant="h6" sx={{ lineHeight: 1.3 }}>
               {user.name || user.email}
             </Typography>
             {user.name ? (

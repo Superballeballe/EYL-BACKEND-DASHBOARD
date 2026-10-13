@@ -188,7 +188,7 @@ export default function HubContactsBoard({ contacts: initialContacts }: { contac
         <EmptyState message="No contacts yet. The app uses its built-in number until you add one." />
       ) : (
         <TableContainer sx={tableShellSx}>
-          <Table size="small">
+          <Table>
             <TableHead>
               <TableRow>
                 <TableCell align="right" sx={{ width: 64 }}>
@@ -296,7 +296,7 @@ export default function HubContactsBoard({ contacts: initialContacts }: { contac
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDelete} disabled={deleting}>
+          <Button variant="outlined" onClick={closeDelete} disabled={deleting}>
             Cancel
           </Button>
           <Button color="error" variant="contained" onClick={removeContact} disabled={deleting}>

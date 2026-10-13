@@ -31,7 +31,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import SalaryRecordForm from "@/components/SalaryRecordForm";
 import { EmptyState } from "@/components/ui";
 import { money } from "@/lib/format";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 
 type KnightOpt = { id: string; display_name: string; role: string | null };
 type Cell = { travel: string; salary: string };
@@ -136,10 +136,7 @@ export default function SalariesBoard({ knights }: { knights: KnightOpt[] }) {
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap" }}>
@@ -252,13 +249,13 @@ export default function SalariesBoard({ knights }: { knights: KnightOpt[] }) {
               })}
             </TableBody>
             <TableFooter>
-              <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                <TableCell colSpan={2} sx={{ fontWeight: 700 }}>
+              <TableRow sx={{ bgcolor: "action.hover" }}>
+                <TableCell colSpan={2} sx={{ fontWeight: 600 }}>
                   Total
                 </TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>{money(totals.travel)}</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>{money(totals.salary)}</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>{money(totals.total)}</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{money(totals.travel)}</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{money(totals.salary)}</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{money(totals.total)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>

@@ -27,7 +27,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import RateTierForm from "@/components/RateTierForm";
 import { EmptyState } from "@/components/ui";
 import { money } from "@/lib/format";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 import type { RateTier } from "@/lib/types";
 
 export default function RatesBoard({ tiers }: { tiers: RateTier[] }) {
@@ -54,10 +54,7 @@ export default function RatesBoard({ tiers }: { tiers: RateTier[] }) {
           alignItems: { sm: "center" },
           mb: 2.5,
           p: 2,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          ...panelSx,
         }}
       >
         <FormControl size="small" sx={{ minWidth: 160 }}>

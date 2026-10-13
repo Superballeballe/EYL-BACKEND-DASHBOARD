@@ -2,21 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Step,
-  StepButton,
-  Stepper,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Dialog, DialogActions, IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import DeliveryForm, { type DeliveryFormHandle } from "@/components/DeliveryForm";
+import DeliveryForm, {
+  DELIVERY_FORM_STEPS as STEPS,
+  submitDeliveryForm,
+  type DeliveryFormHandle,
+} from "@/components/DeliveryForm";
+import { DeliveryStepItems, DialogRail, RailGroup, railDialogSx } from "@/components/DialogRail";
 
 type KnightOpt = { id: string; display_name: string };
 type ClientOpt = {
@@ -28,7 +21,6 @@ type ClientOpt = {
 };
 type RateTier = { min_km: number | null; max_km: number | null; fee: number | null };
 
-const STEPS = ["Booking", "Route", "Assignment", "Payment", "Billing"] as const;
 const FORM_ID = "new-delivery-form";
 
 export default function NewDeliveryButton({
@@ -76,14 +68,8 @@ export default function NewDeliveryButton({
     setStep(index);
   }
 
-  async function handleCreate() {
-    const result = await formRef.current?.validateAllSteps();
-    if (!result?.ok) {
-      if (result?.firstInvalidStep != null) setStep(result.firstInvalidStep);
-      return;
-    }
-    const form = document.getElementById(FORM_ID);
-    if (form instanceof HTMLFormElement) form.requestSubmit();
+  function handleCreate() {
+    return submitDeliveryForm(formRef.current, FORM_ID, setStep);
   }
 
   return (
@@ -92,70 +78,68 @@ export default function NewDeliveryButton({
         + New delivery
       </Button>
 
-      <Dialog open={open} onClose={close} fullWidth maxWidth="md">
-        <DialogTitle sx={{ pr: 6 }}>
-          New delivery
-          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25, fontWeight: 400 }}>
-            Step {step + 1} of {STEPS.length} · {STEPS[step]}
-          </Typography>
-          <IconButton
-            aria-label="Close"
-            onClick={close}
-            sx={{ position: "absolute", right: 12, top: 12 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+      <Dialog open={open} onClose={close} fullWidth maxWidth="lg" aria-labelledby="new-delivery-title">
+        <Box sx={railDialogSx}>
+          <DialogRail label="New delivery steps">
+            <RailGroup title="New delivery">
+              <DeliveryStepItems current={step} doneBefore={step} onSelect={goToStep} />
+            </RailGroup>
+          </DialogRail>
 
-        <DialogContent dividers sx={{ pt: 2 }}>
-          <Stepper activeStep={step} nonLinear alternativeLabel sx={{ mb: 3, display: { xs: "none", sm: "flex" } }}>
-            {STEPS.map((label, index) => (
-              <Step key={label} completed={index < step}>
-                <StepButton color="inherit" onClick={() => goToStep(index)}>
-                  {label}
-                </StepButton>
-              </Step>
-            ))}
-          </Stepper>
+          <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 3, pt: 3, pb: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography id="new-delivery-title" component="h2" variant="h6">
+                  New delivery
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
+                  Step {step + 1} of {STEPS.length} · {STEPS[step]}
+                </Typography>
+              </Box>
+              <IconButton aria-label="Close" onClick={close} sx={{ mt: -0.5, mr: -1 }}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
 
-          <Box sx={{ maxHeight: "min(60vh, 520px)", overflowY: "auto", pr: 0.5 }}>
-            <DeliveryForm
-              ref={formRef}
-              mode="new"
-              variant="modal"
-              wizardStep={step}
-              hideActions
-              formId={FORM_ID}
-              knights={knights}
-              clients={clients}
-              rateTiers={rateTiers}
-              onSaved={handleSaved}
-              onCancel={close}
-            />
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 3, py: 2.5, borderTop: 1, borderColor: "divider" }}>
+              <DeliveryForm
+                ref={formRef}
+                mode="new"
+                variant="modal"
+                wizardStep={step}
+                hideActions
+                formId={FORM_ID}
+                knights={knights}
+                clients={clients}
+                rateTiers={rateTiers}
+                onSaved={handleSaved}
+                onCancel={close}
+              />
+            </Box>
+
+            <DialogActions sx={{ justifyContent: "space-between", pt: 2 }}>
+              <Button variant="outlined" onClick={close}>
+                Cancel
+              </Button>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                {step > 0 ? (
+                  <Button variant="outlined" onClick={() => setStep((s) => s - 1)}>
+                    Back
+                  </Button>
+                ) : null}
+                {!isLast ? (
+                  <Button variant="contained" onClick={goNext}>
+                    Next
+                  </Button>
+                ) : (
+                  <Button variant="contained" onClick={handleCreate}>
+                    Create delivery
+                  </Button>
+                )}
+              </Box>
+            </DialogActions>
           </Box>
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
-          <Button variant="outlined" onClick={close}>
-            Cancel
-          </Button>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            {step > 0 ? (
-              <Button variant="outlined" onClick={() => setStep((s) => s - 1)}>
-                Back
-              </Button>
-            ) : null}
-            {!isLast ? (
-              <Button variant="contained" onClick={goNext}>
-                Next
-              </Button>
-            ) : (
-              <Button variant="contained" onClick={handleCreate}>
-                Create delivery
-              </Button>
-            )}
-          </Box>
-        </DialogActions>
+        </Box>
       </Dialog>
     </>
   );

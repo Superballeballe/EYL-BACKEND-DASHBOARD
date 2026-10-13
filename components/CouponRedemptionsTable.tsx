@@ -23,11 +23,11 @@ export default function CouponRedemptionsTable({ redemptions }: { redemptions: C
 
   return (
     <Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
         Recent redemptions
       </Typography>
       <TableContainer sx={tableShellSx}>
-        <Table size="small">
+        <Table>
           <TableHead>
             <TableRow>
               <TableCell>Coupon</TableCell>

@@ -39,12 +39,12 @@ export default async function KnightDetailPage({
       />
 
       <div className="card p-5 mb-5">
-        <h2 className="font-bold mb-4">Details</h2>
+        <h2 className="mb-4 text-sm font-semibold">Details</h2>
         <KnightForm mode="edit" id={id} initial={k} />
       </div>
 
       <div className="card p-5">
-        <h2 className="font-bold mb-4">Salary history</h2>
+        <h2 className="mb-4 text-sm font-semibold">Salary history</h2>
         <div className="mb-5">
           <SalaryForm knightId={id} />
         </div>

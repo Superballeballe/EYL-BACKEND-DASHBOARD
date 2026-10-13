@@ -298,7 +298,7 @@ export default function PlottingMapBoard({
                           borderRadius: 1,
                           border: "1px solid",
                           borderColor: active ? "primary.main" : "divider",
-                          bgcolor: active ? "#eff6ff" : "#fff",
+                          bgcolor: active ? "action.selected" : "#fff",
                           cursor: "pointer",
                           font: "inherit",
                         }}
@@ -313,7 +313,7 @@ export default function PlottingMapBoard({
                               flexShrink: 0,
                             }}
                           />
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {serialLabel(d)}
                           </Typography>
                         </Stack>

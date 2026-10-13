@@ -259,7 +259,7 @@ export default function RefundModeControl({
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTarget(null)} disabled={busy}>
+          <Button variant="outlined" onClick={() => setTarget(null)} disabled={busy}>
             Cancel
           </Button>
           <Button variant="contained" color={target === "live" ? "primary" : "warning"} onClick={submit} disabled={busy}>

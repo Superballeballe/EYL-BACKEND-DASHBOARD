@@ -7,7 +7,6 @@ import {
   Button,
   ButtonGroup,
   Chip,
-  Divider,
   IconButton,
   MenuItem,
   Select,
@@ -27,9 +26,9 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveIcon from "@mui/icons-material/Save";
 import TodayIcon from "@mui/icons-material/Today";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { fmtDate, isSundayISO, todayISO, weekdayLong } from "@/lib/format";
-import { tableShellSx } from "@/lib/surface";
+import { panelSx, tableShellSx } from "@/lib/surface";
 
 type KnightOpt = { id: string; display_name: string; role: string | null; default_location: string | null };
 
@@ -97,7 +96,7 @@ function formatShiftRange(start: string, end: string): string {
   return start || end || "";
 }
 
-const timeFieldSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff" }, minWidth: 118 };
+const timeFieldSx = { minWidth: 118 };
 
 export default function LineupEditor({
   knights,
@@ -266,49 +265,28 @@ export default function LineupEditor({
 
   return (
     <Box>
-      <Box
-        sx={{
-          mb: 2.5,
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          overflow: "hidden",
-        }}
-      >
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{
-            p: 2,
-            alignItems: { sm: "center" },
-            justifyContent: "space-between",
-            bgcolor: "grey.50",
-          }}
-        >
-          <Box>
-            <Typography variant="h1">Daily Lineup</Typography>
-            <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
-              Who is working, where, and their shift
-            </Typography>
-          </Box>
+      <PageHeader
+        title="Daily Lineup"
+        subtitle="Who is working, where, and their shift"
+        action={
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               {walkers.length} walkers · {bikers.length} bikers
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={save}
-              disabled={saving || loading}
-            >
+            <Button variant="contained" startIcon={<SaveIcon />} onClick={save} disabled={saving || loading}>
               {saving ? "Saving…" : "Save lineup"}
             </Button>
           </Stack>
-        </Stack>
+        }
+      />
 
-        <Divider />
-
+      <Box
+        sx={{
+          mb: 2.5,
+          ...panelSx,
+          overflow: "hidden",
+        }}
+      >
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
@@ -319,7 +297,7 @@ export default function LineupEditor({
               <IconButton
                 aria-label="Previous day"
                 onClick={() => setDate((d) => shiftDate(d, -1))}
-                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "4px 0 0 4px" }}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "8px 0 0 8px" }}
               >
                 <ChevronLeftIcon fontSize="small" />
               </IconButton>
@@ -334,7 +312,7 @@ export default function LineupEditor({
               <IconButton
                 aria-label="Next day"
                 onClick={() => setDate((d) => shiftDate(d, 1))}
-                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "0 4px 4px 0" }}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "0 8px 8px 0" }}
               >
                 <ChevronRightIcon fontSize="small" />
               </IconButton>
@@ -350,7 +328,7 @@ export default function LineupEditor({
             />
 
             <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {fmtDate(date)}
               </Typography>
               {weekday ? (
@@ -546,7 +524,6 @@ function RoleTable({
                         displayEmpty
                         value={r.knight_id ?? ""}
                         onChange={(e) => pickKnight(i, e.target.value)}
-                        sx={{ bgcolor: "#fff" }}
                         renderValue={(value) => {
                           if (!value) return <em style={{ color: "#94a3b8" }}>Select knight</em>;
                           return knights.find((k) => k.id === value)?.display_name ?? r.knight_name;
@@ -569,7 +546,6 @@ function RoleTable({
                         value={r.location}
                         onChange={(e) => update(i, { location: e.target.value })}
                         placeholder="Area / hub"
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                       />
                     </TableCell>
                     <TableCell sx={{ minWidth: 260 }}>
@@ -633,7 +609,6 @@ function RoleTable({
                         fullWidth
                         value={r.status}
                         onChange={(e) => update(i, { status: e.target.value as Row["status"] })}
-                        sx={{ bgcolor: "#fff" }}
                       >
                         <MenuItem value="working">{STATUS_LABEL.working}</MenuItem>
                         <MenuItem value="half_day">{STATUS_LABEL.half_day}</MenuItem>

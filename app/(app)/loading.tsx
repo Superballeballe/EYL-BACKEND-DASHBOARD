@@ -1,9 +1,11 @@
 import { Box, LinearProgress, Skeleton, Stack } from "@mui/material";
+import { panelSx } from "@/lib/surface";
 
 export default function AppLoading() {
   return (
     <>
       <LinearProgress
+        color="info"
         sx={{
           position: "fixed",
           top: 0,
@@ -15,33 +17,19 @@ export default function AppLoading() {
 
       <Box aria-busy aria-label="Loading page">
         {/* Page header skeleton */}
-        <Box
-          sx={{
-            mb: 3,
-            p: 2.5,
-            borderRadius: 1,
-            border: "1px solid",
-            borderColor: "divider",
-            bgcolor: "background.paper",
-          }}
-        >
-          <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Box sx={{ flex: 1 }}>
-              <Skeleton variant="text" width={200} height={36} />
-              <Skeleton variant="text" width={280} height={22} sx={{ mt: 0.5 }} />
-            </Box>
-            <Skeleton variant="rounded" width={140} height={36} sx={{ display: { xs: "none", sm: "block" } }} />
-          </Stack>
-        </Box>
+        <Stack direction="row" spacing={2} sx={{ mb: 2, justifyContent: "space-between", alignItems: "center" }}>
+          <Box sx={{ flex: 1 }}>
+            <Skeleton variant="text" width={160} height={28} />
+            <Skeleton variant="text" width={240} height={20} />
+          </Box>
+          <Skeleton variant="rounded" width={120} height={32} sx={{ display: { xs: "none", sm: "block" } }} />
+        </Stack>
 
         {/* Toolbar / filters skeleton */}
         <Box
           sx={{
             mb: 2.5,
-            borderRadius: 1,
-            border: "1px solid",
-            borderColor: "divider",
-            bgcolor: "background.paper",
+            ...panelSx,
             overflow: "hidden",
           }}
         >
@@ -62,10 +50,7 @@ export default function AppLoading() {
         {/* Main content skeleton */}
         <Box
           sx={{
-            borderRadius: 1,
-            border: "1px solid",
-            borderColor: "divider",
-            bgcolor: "background.paper",
+            ...panelSx,
             p: 2,
           }}
         >
