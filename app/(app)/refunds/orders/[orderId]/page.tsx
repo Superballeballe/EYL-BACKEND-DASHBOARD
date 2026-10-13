@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import OrderRefundButton from "@/components/OrderRefundButton";
 import RetryRefundButton from "@/components/RetryRefundButton";
@@ -47,6 +48,7 @@ export default async function OrderRefundPage({ params }: { params: Promise<{ or
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title={`Order ${code ?? ""}`.trim()}
         subtitle={<Link href="/refunds">← Refunds</Link>}

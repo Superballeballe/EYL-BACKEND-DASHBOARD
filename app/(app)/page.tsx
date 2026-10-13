@@ -1,4 +1,5 @@
 import Typography from "@mui/material/Typography";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import DashboardShell from "@/components/DashboardShell";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
@@ -233,6 +234,7 @@ export default async function Dashboard() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Dashboard"
         subtitle={

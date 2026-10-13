@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import EylKnightReview from "@/components/EylKnightReview";
 import { signedKnightDocuments } from "@/lib/server/knightDocuments";
@@ -23,6 +24,7 @@ export default async function EylKnightDetailPage({
 
   return (
     <div className="max-w-5xl">
+      <AutoRefresh />
       <PageHeader
         title="Knight applicant"
         subtitle={

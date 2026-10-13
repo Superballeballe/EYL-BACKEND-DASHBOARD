@@ -1,3 +1,4 @@
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import RefundsBoard from "@/components/RefundsBoard";
 import { loadRefundsPageData } from "@/lib/server/refundsData";
@@ -14,6 +15,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Refunds"
         subtitle="Automatic refunds, payments that need review, and the auto-refund mode. The dashboard never refunds on its own."

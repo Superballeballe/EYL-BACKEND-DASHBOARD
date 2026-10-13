@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import HubContactsBoard from "@/components/HubContactsBoard";
 import { HUB_CONTACT_COLUMNS } from "@/lib/server/hubContacts";
@@ -28,6 +29,7 @@ export default async function HubContactsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader title="Customer care contact" subtitle={SUBTITLE} />
       <HubContactsBoard contacts={(data ?? []) as HubContact[]} />
     </div>

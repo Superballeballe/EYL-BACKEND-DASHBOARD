@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import InvoicesBoard from "@/components/InvoicesBoard";
 import type { AppInvoice } from "@/lib/types";
@@ -20,6 +21,7 @@ export default async function InvoicesPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Tax invoices"
         subtitle="App-issued invoices for GST reporting — read from Supabase"

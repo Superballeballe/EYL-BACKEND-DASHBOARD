@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import EylKnightsBoard from "@/components/EylKnightsBoard";
 import type { EylKnight } from "@/lib/types";
@@ -16,6 +17,7 @@ export default async function EylKnightsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Approve new knights"
         subtitle={`${applicants.length} applicant${applicants.length === 1 ? "" : "s"}`}

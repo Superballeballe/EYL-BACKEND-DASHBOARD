@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import AutoRefresh from "@/components/AutoRefresh";
 import NewDeliveryButton from "@/components/NewDeliveryButton";
 import DeliveriesFilters from "@/components/DeliveriesFilters";
 import DeliveriesPagination from "@/components/DeliveriesPagination";
@@ -106,6 +107,7 @@ export default async function DeliveriesPage({
 
   return (
     <div>
+      <AutoRefresh />
       <DeliveriesFilters
         knights={knights}
         total={total}

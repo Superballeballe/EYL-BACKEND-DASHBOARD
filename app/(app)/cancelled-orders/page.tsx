@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import CancelledOrdersTable from "@/components/CancelledOrdersTable";
 import type { CancelledOrder } from "@/lib/types";
@@ -17,6 +18,7 @@ export default async function CancelledOrdersPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <PageHeader
         title="Cancelled orders"
         subtitle="Cancellations with reason. A paid order cancelled before pickup is refunded in full, automatically. Only a failed refund needs a retry."
