@@ -12,8 +12,10 @@
 -- with that, so a fresh environment built from both repos in any order works.
 -- 0003 is left untouched (it has already run where it ran); do not re-run it.
 --
--- The list is the app's (EYL-APP/supabase/snippets/draft-orders.sql), a
--- superset of 0003's, so every existing row still passes. Idempotent.
+-- The list is the app's (EYL-APP/supabase/snippets/draft-orders.sql) plus
+-- the legacy 'confirmed', exactly what production allows today (checked
+-- 2026-10-15), and a superset of 0003's, so it never narrows production and
+-- every existing row still passes. Idempotent.
 --
 -- Rollback (only if you really want 0003's narrow list back, which breaks
 -- bookings): re-run the constraint block from 0003.
@@ -23,5 +25,5 @@ alter table public.orders
   add constraint orders_status_check
   check (status in (
     'draft', 'placed', 'picked_up', 'in_transit', 'delivered', 'cancelled',
-    'pending', 'registered', 'accepted', 'rider_assigned', 'assigned'
+    'pending', 'registered', 'accepted', 'confirmed', 'rider_assigned', 'assigned'
   ));
