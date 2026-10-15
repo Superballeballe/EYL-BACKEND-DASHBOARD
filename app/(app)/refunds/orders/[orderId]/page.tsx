@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import { Alert, Box, Card, CardContent, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import AutoRefresh from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui";
 import OrderRefundButton from "@/components/OrderRefundButton";
@@ -18,8 +18,23 @@ import {
   reviewStatusInfo,
 } from "@/lib/refunds";
 import { loadOrderRefund } from "@/lib/server/refundsData";
+import { buildPaymentLedger, type LedgerRow } from "@/lib/paymentLedger";
 
 export const dynamic = "force-dynamic";
+
+const LEDGER_STATUS: Record<string, { label: string; color: "success" | "warning" | "default" }> = {
+  paid: { label: "Paid", color: "success" },
+  applied: { label: "Applied", color: "success" },
+  needs_review: { label: "Needs review", color: "warning" },
+  refunded: { label: "Refunded", color: "default" },
+  resolved: { label: "Resolved", color: "default" },
+};
+
+function ledgerKindLabel(row: LedgerRow) {
+  if (row.kind === "booking") return "Booking";
+  if (row.kind === "address_change") return "Address change";
+  return "Under review";
+}
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -35,7 +50,8 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
 export default async function OrderRefundPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) notFound();
-  const { order, invoice, cancelled, ledger, reviews } = await loadOrderRefund(orderId);
+  const { order, invoice, cancelled, ledger, reviews, extras } = await loadOrderRefund(orderId);
+  const payments = buildPaymentLedger({ invoice, extras, reviews });
   if (!order && !cancelled && reviews.length === 0) notFound();
 
   const code = order?.order_code ?? cancelled?.order_code ?? reviews[0]?.order_code ?? null;
@@ -64,9 +80,78 @@ export default async function OrderRefundPage({ params }: { params: Promise<{ or
             <Line label="Payment">
               {invoice?.payment_status ?? "—"} · {money(invoice?.total_amount ?? null)}
             </Line>
-            <Line label="Razorpay payment">
-              <code>{invoice?.provider_ref ?? "—"}</code>
-            </Line>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <Typography variant="h2" sx={{ mb: 1 }}>
+              Payments
+            </Typography>
+            {payments.rows.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                No payments on this order.
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Payment</TableCell>
+                    <TableCell>Razorpay id</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Time</TableCell>
+                    <TableCell align="right">Running total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {payments.rows.map((row) => {
+                    const status = LEDGER_STATUS[row.status] ?? { label: String(row.status), color: "default" as const };
+                    return (
+                      <TableRow key={`${row.kind}-${row.razorpayPaymentId ?? "none"}`}>
+                        <TableCell>
+                          {ledgerKindLabel(row)}
+                          {row.kind === "review" && row.note ? (
+                            <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                              {row.note}
+                            </Typography>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <code>{row.razorpayPaymentId ?? "—"}</code>
+                        </TableCell>
+                        <TableCell align="right">{formatPaise(row.amountPaise)}</TableCell>
+                        <TableCell>
+                          <Chip size="small" color={status.color} label={status.label} />
+                        </TableCell>
+                        <TableCell>{row.at ? fmtDateTime(row.at) : "—"}</TableCell>
+                        <TableCell align="right">
+                          {row.runningTotalPaise === null ? "not counted" : formatPaise(row.runningTotalPaise)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow>
+                    <TableCell colSpan={5} sx={{ fontWeight: 600 }}>
+                      Total paid for this order
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                      {formatPaise(payments.totalPaise)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )}
+            {payments.reviewPaise > 0 ? (
+              <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
+                {formatPaise(payments.reviewPaise)} captured but not applied: resolve it under Refunds → Needs review.
+              </Typography>
+            ) : null}
+            {!payments.balanced ? (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                Payments do not add up to the invoice total ({formatPaise(payments.invoiceTotalPaise)}). Check this order.
+              </Alert>
+            ) : null}
           </CardContent>
         </Card>
 

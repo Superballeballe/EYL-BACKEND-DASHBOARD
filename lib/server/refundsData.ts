@@ -8,6 +8,7 @@ import {
 } from "@/lib/refunds";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { CancelledOrder, PaymentRefund, PaymentReview } from "@/lib/types";
+import type { LedgerExtra } from "@/lib/paymentLedger";
 
 /**
  * Server-only reads for the Refunds page. Read only: nothing here sends or
@@ -128,8 +129,10 @@ export async function loadRefundsPageData(): Promise<RefundsPageData> {
 
 export type OrderRefundData = {
   order: { id: string; order_code: string | null; status: string | null; confirmed_at: string | null } | null;
-  invoice: { payment_status: string | null; total_amount: number | null; provider_ref: string | null } | null;
+  invoice: { payment_status: string | null; total_amount: number | null; provider_ref: string | null; paid_at: string | null } | null;
   cancelled: CancelledOrder | null;
+  /** Address-change difference payments applied to the order (order_payments). */
+  extras: LedgerExtra[];
   ledger: PaymentRefund[];
   reviews: PaymentReview[];
 };
@@ -137,7 +140,7 @@ export type OrderRefundData = {
 export async function loadOrderRefund(orderId: string): Promise<OrderRefundData> {
   const db = supabaseAdmin();
   const missing: string[] = [];
-  const [order, invoice, cancelled, ledger, reviews] = await Promise.all([
+  const [order, invoice, cancelled, ledger, reviews, extras] = await Promise.all([
     safeRows<OrderRefundData["order"] & object>(
       "orders",
       missing,
@@ -146,7 +149,7 @@ export async function loadOrderRefund(orderId: string): Promise<OrderRefundData>
     safeRows<OrderRefundData["invoice"] & object>(
       "invoices",
       missing,
-      db.from("invoices").select("payment_status, total_amount, provider_ref").eq("order_id", orderId).limit(1),
+      db.from("invoices").select("payment_status, total_amount, provider_ref, paid_at").eq("order_id", orderId).limit(1),
     ),
     safeRows<CancelledOrder>("cancelled_orders", missing, db.from("cancelled_orders").select("*").eq("order_id", orderId).limit(1)),
     safeRows<PaymentRefund>(
@@ -159,11 +162,17 @@ export async function loadOrderRefund(orderId: string): Promise<OrderRefundData>
       missing,
       db.from("payment_reviews").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
     ),
+    safeRows<LedgerExtra>(
+      "order_payments",
+      missing,
+      db.from("order_payments").select("provider_ref, amount, created_at, purpose").eq("order_id", orderId).order("created_at"),
+    ),
   ]);
   return {
     order: order[0] ?? null,
     invoice: invoice[0] ?? null,
     cancelled: cancelled[0] ?? null,
+    extras,
     ledger,
     reviews,
   };
