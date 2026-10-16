@@ -17,7 +17,7 @@ export default async function RatesPage() {
     <div>
       <PageHeader
         title="Rate Cards"
-        subtitle="Km-based pricing used to suggest delivery fees"
+        subtitle="Km-based rate cards. Current eyl rows are the live app prices customers pay."
       />
       <RatesBoard tiers={tiers} />
     </div>
