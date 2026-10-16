@@ -64,6 +64,8 @@ export default function AdminUsersBoard({
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
   const [cancelInviteTarget, setCancelInviteTarget] = useState<InviteRow | null>(null);
+  const [roleTarget, setRoleTarget] = useState<{ user: UserRow; role: UserRow["role"] } | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "operator">("operator");
   const [loading, setLoading] = useState(false);
@@ -126,6 +128,30 @@ export default function AdminUsersBoard({
       setError("Network error");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function changeRole() {
+    if (!roleTarget) return;
+    setChangingRole(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${roleTarget.user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: roleTarget.role }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not change role");
+        return;
+      }
+      setRoleTarget(null);
+      await refreshTeam();
+    } catch {
+      setError("Network error");
+    } finally {
+      setChangingRole(false);
     }
   }
 
@@ -249,12 +275,31 @@ export default function AdminUsersBoard({
                 <TableCell>{u.name || "—"}</TableCell>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
-                  <Chip
-                    size="small"
-                    label={u.role}
-                    color={u.role === "admin" ? "primary" : "default"}
-                    variant={u.role === "admin" ? "filled" : "outlined"}
-                  />
+                  {isSelf ? (
+                    <Tooltip title="You cannot change your own role">
+                      <Chip
+                        size="small"
+                        label={u.role}
+                        color={u.role === "admin" ? "primary" : "default"}
+                        variant={u.role === "admin" ? "filled" : "outlined"}
+                      />
+                    </Tooltip>
+                  ) : (
+                    <Select
+                      size="small"
+                      variant="standard"
+                      value={u.role}
+                      inputProps={{ "aria-label": `Role for ${u.email}` }}
+                      onChange={(e) => {
+                        const next = e.target.value as UserRow["role"];
+                        if (next !== u.role) setRoleTarget({ user: u, role: next });
+                      }}
+                      sx={{ fontSize: "0.875rem", minWidth: 110 }}
+                    >
+                      <MenuItem value="operator">Operator</MenuItem>
+                      <MenuItem value="admin">Admin</MenuItem>
+                    </Select>
+                  )}
                 </TableCell>
                 <TableCell>{fmtDate(u.last_login_at)}</TableCell>
                 <TableCell>{fmtDate(u.created_at.slice(0, 10))}</TableCell>
@@ -328,6 +373,29 @@ export default function AdminUsersBoard({
           </Button>
           <Button color="error" variant="contained" onClick={removeUser} disabled={deleting}>
             {deleting ? "Removing…" : "Remove"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!roleTarget} onClose={() => setRoleTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {roleTarget?.role === "admin" ? "Make admin?" : "Change to operator?"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {roleTarget
+              ? roleTarget.role === "admin"
+                ? `${roleTarget.user.name || roleTarget.user.email} will be able to manage the team: invite and remove users and change roles.`
+                : `${roleTarget.user.name || roleTarget.user.email} will lose admin access, including this Team page.`
+              : null}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setRoleTarget(null)} disabled={changingRole}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={changeRole} disabled={changingRole}>
+            {changingRole ? "Saving…" : roleTarget?.role === "admin" ? "Make admin" : "Change role"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -10,8 +10,9 @@ import {
   type SessionPayload,
 } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { TeamRole } from "@/lib/teamRoles";
 
-export type DashboardRole = "admin" | "operator";
+export type DashboardRole = TeamRole;
 
 export type DashboardUser = {
   id: string;
@@ -113,6 +114,18 @@ export async function countActiveAdmins(): Promise<number> {
     .eq("active", true);
   if (error) throw error;
   return count ?? 0;
+}
+
+export async function updateDashboardUserRole(userId: string, role: DashboardRole): Promise<DashboardUser> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("dashboard_users")
+    .update({ role })
+    .eq("id", userId)
+    .select(USER_COLUMNS)
+    .single();
+  if (error) throw error;
+  return data as DashboardUser;
 }
 
 export async function deleteDashboardUser(userId: string) {
