@@ -350,3 +350,5 @@ const hubContactBaseSchema = z.object({
 export const hubContactSchema = hubContactBaseSchema;
 export const hubContactUpdateSchema = hubContactBaseSchema.partial();
 export type HubContactInput = z.infer<typeof hubContactSchema>;
+
+export * from "./whatsapp";

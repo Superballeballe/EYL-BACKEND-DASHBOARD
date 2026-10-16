@@ -13,6 +13,9 @@ const PUBLIC_PREFIXES = [
   "/api/auth/verify-email",
   "/api/auth/resend-verification",
   "/api/health",
+  // The WhatsApp bot authenticates with x-integration-key, checked by every
+  // route under this prefix (checkIntegrationKey), not with a session/API_KEY.
+  "/api/integrations/whatsapp",
 ];
 
 export async function middleware(req: NextRequest) {

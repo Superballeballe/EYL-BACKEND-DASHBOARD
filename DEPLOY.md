@@ -24,6 +24,7 @@ A hardened Docker Compose setup for self-hosting the Next.js dashboard.
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps JS key (**build arg**; enable Maps JS / Places / Directions / Geocoding; allow your prod domain in key referrers) |
 | `SESSION_SECRET` | Random 32+ byte string (`openssl rand -hex 32`) |
 | `API_KEY` | Secret for `x-api-key` write endpoints |
+| `WHATSAPP_INTEGRATION_KEY` | Secret for the WhatsApp bot's `x-integration-key`; only opens `/api/integrations/whatsapp/*`. Leave empty to keep the integration off. |
 | `DASHBOARD_DOMAIN` | (proxy only) real hostname for Let's Encrypt TLS |
 
 > Razorpay keys live in **Supabase Edge Function secrets** (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`). The dashboard never calls Razorpay or `razorpay-refund`; ops clicks go through the `ops-refund` function. Do not put Razorpay keys in `.env.local`.

@@ -7,6 +7,7 @@ This directory documents the dashboard HTTP API and the shared Supabase surface 
 - [Access control](access-control.md)
 - [Order lifecycle](order-lifecycle.md)
 - [Production drift](production-drift.md)
+- [WhatsApp bot integration](whatsapp-integration.md)
 - [Dashboard OpenAPI](openapi/dashboard.openapi.yaml)
 - [Supabase Edge Functions OpenAPI](openapi/supabase-functions.openapi.yaml)
 - [Read-only live verification queries](live-verification.sql)

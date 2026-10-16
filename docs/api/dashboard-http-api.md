@@ -9,6 +9,8 @@
 1. a valid signed dashboard session cookie, or
 2. `x-api-key: $API_KEY`.
 
+`/api/integrations/whatsapp/*` is also let through by middleware; each of those routes requires `x-integration-key: $WHATSAPP_INTEGRATION_KEY` itself and rejects cookies and `API_KEY`. See [WhatsApp bot integration](whatsapp-integration.md).
+
 The route then runs with the server-only [service-role client](../../lib/supabase/admin.ts), which bypasses RLS. A route marked **session** performs an additional full user lookup (active and email-verified); an API key alone cannot pass it. **Admin** additionally requires `dashboard_users.role = admin`. The two SSE routes validate a signed cookie payload directly. Public auth routes and health are the only middleware exceptions.
 
 ## Public auth and health
@@ -100,6 +102,20 @@ Body field definitions are in [`lib/schemas/index.ts`](../../lib/schemas/index.t
 | Any | `POST/GET /api/refunds/process-pending` | — | Retired: `410`, does nothing. |
 
 The dashboard never processes refunds on its own. Automatic refunds belong to the database worker; every dashboard money move is an explicit ops click through `ops-refund` ([`lib/server/opsRefund.ts`](../../lib/server/opsRefund.ts)) with the signed-in user as `actor`.
+
+## WhatsApp bot integration
+
+All require `x-integration-key` (else `401`); a session cookie or `API_KEY` does not work. Details and error codes: [whatsapp-integration.md](whatsapp-integration.md).
+
+| Method and path | Request | Response and side effects |
+|---|---|---|
+| `POST /api/integrations/whatsapp/customers` | `{wa_id, name?}` | `{user_id, created, phone10, name}`; creates a phone-confirmed auth user if needed and upserts `whatsapp_customers`. [Source](../../app/api/integrations/whatsapp/customers/route.ts) |
+| `POST /api/integrations/whatsapp/quote` | `{pickup, stops[], round_trip, delicate}` | `quote_booking` amounts. [Source](../../app/api/integrations/whatsapp/quote/route.ts) |
+| `POST /api/integrations/whatsapp/orders` | Contract order body (idempotent on `id`) | `create_booking_as` → `whatsapp_order_links` → `razorpay-payment-link`; `201`, or `200` on replay. [Source](../../app/api/integrations/whatsapp/orders/route.ts) |
+| `GET /api/integrations/whatsapp/orders?wa_id=&limit=` | Query | `{data: OrderView[]}`, newest first. |
+| `GET /api/integrations/whatsapp/orders/:id` | Path order UUID | One linked order; `404` for orders not placed through WhatsApp. [Source](../../app/api/integrations/whatsapp/orders/[id]/route.ts) |
+| `POST /api/integrations/whatsapp/orders/:id/payment-link` | None | Active or new payment link. [Source](../../app/api/integrations/whatsapp/orders/[id]/payment-link/route.ts) |
+| `GET /api/integrations/whatsapp/events?after=&limit=` | Query cursor | `{data: OrderEvent[], next_cursor}` from `integration_order_events`. [Source](../../app/api/integrations/whatsapp/events/route.ts) |
 
 ## Non-JSON endpoints
 

@@ -24,6 +24,7 @@ The dashboard's [service-role client](../../lib/supabase/admin.ts) bypasses RLS.
 | Read current user/change password | No | **No** | Yes | Yes |
 | List/invite/delete dashboard users or invites | No | **No** | No | Yes |
 | Render invoice HTML | No | Yes | Yes | Yes |
+| WhatsApp bot integration (`/api/integrations/whatsapp/*`) | Only with `x-integration-key` | **No** | **No** | **No** |
 
 An API key gets broad operator-equivalent access because middleware is the only check on most routes. It cannot satisfy `requireSessionUser` or `requireAdmin`; in particular it cannot satisfy admin routes. SSE also explicitly requires the cookie payload.
 

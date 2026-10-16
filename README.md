@@ -28,6 +28,7 @@ Edit `.env.local` (already created; **fill in the service-role key**):
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public key (optional for now) |
 | `SESSION_SECRET` | Random string used to sign the login cookie |
 | `API_KEY` | Secret for the `x-api-key` header on automation endpoints |
+| `WHATSAPP_INTEGRATION_KEY` | Secret the WhatsApp bot sends as `x-integration-key`; only opens `/api/integrations/whatsapp/*` ([docs](docs/api/whatsapp-integration.md)) |
 | `RESEND_API_KEY` / `INVITE_FROM_EMAIL` | Dashboard verification and invitation email |
 | `APP_URL` | Public dashboard URL used in email links |
 

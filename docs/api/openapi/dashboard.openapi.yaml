@@ -30,6 +30,10 @@ tags:
   - name: Pricing
   - name: Invoices
   - name: System
+  - name: WhatsApp
+    description: |
+      WhatsApp bot integration (docs/api/whatsapp-integration.md). Only the
+      `x-integration-key` header is accepted; session cookies and `x-api-key` are not.
 paths:
   /api/auth/login:
     post:
@@ -802,6 +806,196 @@ paths:
                   supabaseConfigured: { type: boolean }
                   time: { type: string, format: date-time }
                 additionalProperties: false
+  /api/integrations/whatsapp/customers:
+    post:
+      tags: [WhatsApp]
+      summary: Resolve or create the EYL customer for a WhatsApp number
+      security: [{ integration_key: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wa_id]
+              properties:
+                wa_id: { $ref: "#/components/schemas/WaId" }
+                name: { type: [string, "null"], maxLength: 100 }
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user_id, created, phone10, name]
+                properties:
+                  user_id: { type: string, format: uuid }
+                  created: { type: boolean }
+                  phone10: { $ref: "#/components/schemas/Phone10" }
+                  name: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/WhatsappConflict" }
+        "422": { $ref: "#/components/responses/WhatsappBusinessRule" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/integrations/whatsapp/quote:
+    post:
+      tags: [WhatsApp]
+      summary: Quote a route exactly as reprice_order would
+      security: [{ integration_key: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pickup, stops, round_trip, delicate]
+              properties:
+                pickup: { $ref: "#/components/schemas/LatLng" }
+                stops:
+                  type: array
+                  minItems: 1
+                  maxItems: 6
+                  items:
+                    allOf:
+                      - $ref: "#/components/schemas/LatLng"
+                      - type: object
+                        properties:
+                          is_return: { type: boolean, description: Only on the last stop of a round trip. }
+                round_trip: { type: boolean }
+                delicate: { type: boolean }
+      responses:
+        "200":
+          description: Quote in whole INR
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [km, fare, handling_fee, taxable, cgst, sgst, total, currency]
+                properties:
+                  km: { type: number }
+                  fare: { type: integer }
+                  handling_fee: { type: integer }
+                  taxable: { type: integer }
+                  cgst: { type: integer }
+                  sgst: { type: integer }
+                  total: { type: integer }
+                  currency: { type: string, const: INR }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/WhatsappBusinessRule" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/integrations/whatsapp/orders:
+    post:
+      tags: [WhatsApp]
+      summary: Place a booking and return its payment link (idempotent on id)
+      security: [{ integration_key: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WhatsappOrderCreate" }
+      responses:
+        "200":
+          description: Replay of an existing id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WhatsappOrderCreated" }
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WhatsappOrderCreated" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/WhatsappConflict" }
+        "422": { $ref: "#/components/responses/WhatsappBusinessRule" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    get:
+      tags: [WhatsApp]
+      summary: A WhatsApp customer's recent orders, newest first
+      security: [{ integration_key: [] }]
+      parameters:
+        - { name: wa_id, in: query, required: true, schema: { $ref: "#/components/schemas/WaId" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/WhatsappOrderView" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/integrations/whatsapp/orders/{id}:
+    get:
+      tags: [WhatsApp]
+      summary: One WhatsApp-placed order
+      security: [{ integration_key: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WhatsappOrderView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/integrations/whatsapp/orders/{id}/payment-link:
+    post:
+      tags: [WhatsApp]
+      summary: Return the active payment link or issue a new one
+      security: [{ integration_key: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Payment link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payment_url, payment_link_id, expires_at, total]
+                properties:
+                  payment_url: { type: string, format: uri }
+                  payment_link_id: { type: string }
+                  expires_at: { type: [string, "null"], format: date-time }
+                  total: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/WhatsappBusinessRule" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /api/integrations/whatsapp/events:
+    get:
+      tags: [WhatsApp]
+      summary: Pull order events after a cursor (outbox)
+      security: [{ integration_key: [] }]
+      parameters:
+        - { name: after, in: query, schema: { type: string, pattern: "^[0-9]{1,19}$", default: "0" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+      responses:
+        "200":
+          description: Events in id order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/WhatsappOrderEvent" } }
+                  next_cursor: { type: string, description: Last returned id, or `after` when empty. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
 components:
   securitySchemes:
     eyl_session:
@@ -813,6 +1007,11 @@ components:
       type: apiKey
       in: header
       name: x-api-key
+    integration_key:
+      type: apiKey
+      in: header
+      name: x-integration-key
+      description: WHATSAPP_INTEGRATION_KEY. Accepted only on /api/integrations/whatsapp/*.
   parameters:
     IdPath:
       name: id
@@ -862,6 +1061,24 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    WhatsappBusinessRule:
+      description: A business rule refused the request
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, code]
+            properties:
+              error: { type: string }
+              code:
+                type: string
+                enum: [unsupported_country, outside_service_area, pickup_too_soon, pickup_too_far, not_payable, deadline_passed]
+    WhatsappConflict:
+      description: The order id or phone is already used elsewhere
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     ServerError:
       description: Server or upstream error
       content:
@@ -869,6 +1086,102 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    WaId: { type: string, pattern: "^[0-9]{8,15}$", description: WhatsApp wa_id with country code; only 91 + 10-digit mobile is supported. }
+    Phone10: { type: string, pattern: "^[6-9][0-9]{9}$" }
+    LatLng:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+    WhatsappStop:
+      allOf:
+        - $ref: "#/components/schemas/LatLng"
+        - type: object
+          required: [line, contact_name, contact_phone]
+          properties:
+            line: { type: string, minLength: 1 }
+            contact_name: { type: string, minLength: 1 }
+            contact_phone: { $ref: "#/components/schemas/Phone10" }
+            building: { type: [string, "null"] }
+            floor: { type: [string, "null"] }
+            apartment: { type: [string, "null"] }
+            company: { type: [string, "null"] }
+            instructions: { type: [string, "null"] }
+            is_return: { type: boolean, description: Only on the last drop of a round trip. }
+    WhatsappOrderCreate:
+      type: object
+      required: [id, wa_id, sender, pickup, drops, round_trip, item, tier, scheduled_for, recipient_alerts_consent]
+      properties:
+        id: { type: string, format: uuid, description: Idempotency key generated by the bot. }
+        wa_id: { $ref: "#/components/schemas/WaId" }
+        sender:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string, minLength: 1 }
+        pickup: { $ref: "#/components/schemas/WhatsappStop" }
+        drops:
+          type: array
+          minItems: 1
+          maxItems: 6
+          description: 1-5 real drops, optionally followed by one return stop.
+          items: { $ref: "#/components/schemas/WhatsappStop" }
+        round_trip: { type: boolean }
+        item:
+          type: object
+          required: [description, delicate_handling]
+          properties:
+            description: { type: string, minLength: 1 }
+            category: { type: [string, "null"] }
+            weight_kg: { type: [number, "null"], exclusiveMinimum: 0 }
+            delicate_handling: { type: boolean }
+            remarks: { type: [string, "null"] }
+        tier: { type: string, enum: [economy, standard, highspeed] }
+        scheduled_for: { type: string, format: date-time, description: ISO 8601 with offset. }
+        slot_label: { type: [string, "null"] }
+        multi_drop_instructions: { type: [string, "null"] }
+        recipient_alerts_consent: { type: boolean }
+    WhatsappOrderCreated:
+      type: object
+      required: [order_id, order_code, status, total, invoice_number, payment_url, payment_link_id, payment_deadline_at]
+      properties:
+        order_id: { type: string, format: uuid }
+        order_code: { type: string }
+        status: { type: string }
+        total: { type: integer }
+        invoice_number: { type: [string, "null"] }
+        payment_url: { type: string, format: uri }
+        payment_link_id: { type: string }
+        payment_deadline_at: { type: [string, "null"], format: date-time }
+    WhatsappOrderView:
+      type: object
+      required: [order_id, order_code, status, payment_status, total, knight_name, scheduled_for, pickup_line, drop_lines, payment_deadline_at, confirm_deadline_at, tracking_url]
+      properties:
+        order_id: { type: string, format: uuid }
+        order_code: { type: string }
+        status: { type: string }
+        payment_status: { type: string, enum: [pending, paid, failed, refunded] }
+        total: { type: integer }
+        knight_name: { type: [string, "null"] }
+        scheduled_for: { type: [string, "null"], format: date-time }
+        pickup_line: { type: string }
+        drop_lines: { type: array, items: { type: string } }
+        payment_deadline_at: { type: [string, "null"], format: date-time }
+        confirm_deadline_at: { type: [string, "null"], format: date-time }
+        tracking_url: { type: [string, "null"] }
+    WhatsappOrderEvent:
+      type: object
+      required: [id, order_id, order_code, wa_id, kind, status, payload, created_at]
+      properties:
+        id: { type: string, description: bigserial as string, strictly increasing. }
+        order_id: { type: string, format: uuid }
+        order_code: { type: string }
+        wa_id: { $ref: "#/components/schemas/WaId" }
+        kind: { type: string, enum: [payment_received, confirmed, assigned, picked_up, in_transit, delivered, cancelled, refund_initiated] }
+        status: { type: string }
+        payload: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
     Error:
       type: object
       required: [error]
