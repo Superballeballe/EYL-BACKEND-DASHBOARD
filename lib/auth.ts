@@ -82,10 +82,8 @@ export function cookieSecure(req: Request): boolean {
   );
 }
 
-/** Constant-time-ish comparison of the request's API key against API_KEY. */
-export function checkApiKey(req: Request): boolean {
-  const provided = req.headers.get("x-api-key");
-  const expected = process.env.API_KEY;
+/** Constant-time-ish string comparison; false when either side is empty. */
+function secretsMatch(provided: string | null | undefined, expected: string | undefined): boolean {
   if (!expected || !provided) return false;
   if (provided.length !== expected.length) return false;
   let diff = 0;
@@ -93,6 +91,20 @@ export function checkApiKey(req: Request): boolean {
     diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
   }
   return diff === 0;
+}
+
+/** Constant-time-ish comparison of the request's API key against API_KEY. */
+export function checkApiKey(req: Request): boolean {
+  return secretsMatch(req.headers.get("x-api-key"), process.env.API_KEY);
+}
+
+/**
+ * The WhatsApp bot's key (`x-integration-key` vs WHATSAPP_INTEGRATION_KEY).
+ * It only opens /api/integrations/whatsapp/*, which middleware lets through
+ * so each route checks this itself. It is never accepted as API_KEY.
+ */
+export function checkIntegrationKey(req: Request): boolean {
+  return secretsMatch(req.headers.get("x-integration-key"), process.env.WHATSAPP_INTEGRATION_KEY);
 }
 
 export async function isWriteAuthorized(req: Request): Promise<boolean> {

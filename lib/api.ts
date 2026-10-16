@@ -25,6 +25,18 @@ export function forbidden(message = "Forbidden") {
   return NextResponse.json({ error: message }, { status: 403 });
 }
 
+export function conflict(message: string, code?: string) {
+  return NextResponse.json({ error: message, ...(code ? { code } : {}) }, { status: 409 });
+}
+
+/** 422: a business rule refused the request; `code` is machine-readable. */
+export function unprocessable(message: string, code: string, details?: unknown) {
+  return NextResponse.json(
+    { error: message, code, ...(details === undefined ? {} : { details }) },
+    { status: 422 },
+  );
+}
+
 export function serverError(e: unknown) {
   let message = "Internal server error";
   if (e instanceof Error) {
