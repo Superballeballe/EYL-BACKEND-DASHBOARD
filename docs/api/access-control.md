@@ -58,7 +58,7 @@ This summarizes intended access plus live exceptions. “Own” always means eva
 | Create/edit/cancel own booking | Intended | No | Direct service-role lifecycle |
 | Pay/restore own draft | Intended | No | No normal caller |
 | Claim open order (`knight_confirm_pickup`) | No | Intended; role checked in function | Direct lifecycle alternative |
-| Set walker transport | No | Assigned knight only in function | Reads it for pricing |
+| Set walker transport | No | Assigned knight only in function | No (walker pricing removed) |
 | Sweep stale drafts/payment windows | Client invokes opportunistically | Not intended | Can invoke as service role |
 | Destructive purge/delete helpers | **Live grant exists; not intended** | **Live grant exists; not intended** | Used for delivery deletion |
 

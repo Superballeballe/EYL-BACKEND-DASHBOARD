@@ -54,8 +54,6 @@ Delivery payload fields are defined in [`lib/schemas/index.ts`](../../lib/schema
 | Cookie/API key | `PATCH /api/deliveries/:id/lifecycle` | One of `{action:"confirm"}`, `{action:"assign",knight_id?,knight_name?,pickup_scheduled_at?,delivery_scheduled_at?}`, `{action:"pickup"}`, `{action:"deliver"}`, `{action:"cancel"}` | Updates delivery and linked app order, validates ordering/schedules and sends best-effort push notifications. App-order cancellation creates refund state; manual cancellation only marks delivery cancelled. [Source](../../app/api/deliveries/[id]/lifecycle/route.ts) |
 | Cookie/API key | `GET /api/deliveries/next-serial?mode=online\|b2b` | Optional mode; default `online` | Next serial metadata. [Source](../../app/api/deliveries/next-serial/route.ts) |
 | Cookie/API key | `GET /api/deliveries/next-invoice` | None | Next invoice metadata. [Source](../../app/api/deliveries/next-invoice/route.ts) |
-| Cookie/API key | `GET /api/pricing/quote` | `km` or `distanceKm`; flags `isCake`, `isFood`, `delicateHandling`/`isFragile`, `keepUpright`, `isLiquid`, `temperatureSensitive` | `{data,seed}` computed from current tiers, surcharges and pricing config. [Source](../../app/api/pricing/quote/route.ts) |
-| Cookie/API key | `POST /api/pricing/quote` | JSON `{orderId}` | Loads app-order walker mode/fare and linked delivery km; returns final quote. No write. |
 | Cookie/API key | `POST /api/import` | JSON `{deliveries:[...]}` (1–1000) | Validates each row with the delivery schema, inserts valid rows, returns `{inserted,failed,errors}`. Despite its comment saying API-key-only, middleware also admits a cookie session. [Source](../../app/api/import/route.ts) |
 
 ### Lifecycle cancellation
