@@ -27,7 +27,6 @@ tags:
   - name: Lineup
   - name: Applicants
   - name: Refunds
-  - name: Pricing
   - name: Invoices
   - name: System
   - name: WhatsApp
@@ -730,41 +729,6 @@ paths:
                   items:
                     $ref: "#/components/schemas/DeliveryInput"
               additionalProperties: false
-      responses:
-        "200": { $ref: "#/components/responses/JsonSuccess" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "500": { $ref: "#/components/responses/ServerError" }
-  /api/pricing/quote:
-    get:
-      tags: [Pricing]
-      summary: Quote delivery pricing from query inputs
-      parameters:
-        - { name: km, in: query, description: Distance; `distanceKm` is also accepted., schema: { type: number, exclusiveMinimum: 0 } }
-        - { name: distanceKm, in: query, schema: { type: number, exclusiveMinimum: 0 } }
-        - { name: isCake, in: query, schema: { type: boolean } }
-        - { name: isFood, in: query, schema: { type: boolean } }
-        - { name: delicateHandling, in: query, schema: { type: boolean } }
-        - { name: isFragile, in: query, schema: { type: boolean } }
-        - { name: keepUpright, in: query, schema: { type: boolean } }
-        - { name: isLiquid, in: query, schema: { type: boolean } }
-        - { name: temperatureSensitive, in: query, schema: { type: boolean } }
-      responses:
-        "200": { $ref: "#/components/responses/JsonSuccess" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "500": { $ref: "#/components/responses/ServerError" }
-    post:
-      tags: [Pricing]
-      summary: Quote an order after walker transport selection
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [orderId]
-              properties:
-                orderId: { type: string }
-              additionalProperties: true
       responses:
         "200": { $ref: "#/components/responses/JsonSuccess" }
         "400": { $ref: "#/components/responses/BadRequest" }
