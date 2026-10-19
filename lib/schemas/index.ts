@@ -284,6 +284,16 @@ export const rateTierSchema = z.object({
 export const rateTierUpdateSchema = rateTierSchema.partial();
 export type RateTierInput = z.infer<typeof rateTierSchema>;
 
+// ---- app handling fees -----------------------------------------------------
+export const handlingFeeUpdateSchema = z.object({
+  amount: z
+    .number({ required_error: "Fee is required", invalid_type_error: "Fee must be a number" })
+    .int("Fee must be whole rupees")
+    .min(0, "Fee can't be negative"),
+  is_current: z.boolean(),
+});
+export type HandlingFeeUpdateInput = z.infer<typeof handlingFeeUpdateSchema>;
+
 // ---- daily lineup ----------------------------------------------------------
 export const assignmentSchema = z.object({
   knight_id: nuuid,

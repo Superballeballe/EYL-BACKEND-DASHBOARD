@@ -98,6 +98,17 @@ export type RateTier = {
   updated_at: string;
 };
 
+export type PricingSurcharge = {
+  id: string;
+  code: string;
+  label: string;
+  amount: number;
+  note: string | null;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MonthlyCoupon = {
   id: string;
   year_month: string;
