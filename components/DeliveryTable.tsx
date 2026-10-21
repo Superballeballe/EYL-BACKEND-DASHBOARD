@@ -30,9 +30,9 @@ import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/Del
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
 import { getDeliveryInstructions, getDeliveryStops } from "@/lib/deliveryRouteDetails";
-import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
+import { formatRecipients, formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
-import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money, routeAreaLabel } from "@/lib/format";
+import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
 import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
 import { deliverySchedule } from "@/lib/deliverySchedule";
 import { effectiveFulfillmentStatus, lifecycleStage } from "@/lib/deliveryStatus";
@@ -130,6 +130,7 @@ export default function DeliveryTable({
           <TableBody>
             {visibleRows.map((delivery) => {
               const schedule = deliverySchedule(delivery);
+              const recipients = formatRecipients(getDeliveryStops(delivery));
               return (
               <TableRow
                 key={delivery.id}
@@ -169,10 +170,13 @@ export default function DeliveryTable({
                   <Typography variant="body2" noWrap title={delivery.sender_name ?? undefined}>
                     {delivery.sender_name ?? "—"}
                   </Typography>
-                  <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block" }}>
-                    {delivery.drop_recipient_name
-                      ? `→ ${delivery.drop_recipient_name}`
-                      : delivery.content ?? ""}
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    title={recipients || undefined}
+                    sx={{ color: "text.secondary", display: "block" }}
+                  >
+                    {recipients ? `→ ${recipients}` : delivery.content ?? ""}
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -270,6 +274,7 @@ export function DeliveryPreviewModal({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const { orderId, source } = orderMeta(delivery);
+  const recipients = formatRecipients(getDeliveryStops(delivery));
 
   useEffect(() => {
     setView("overview");
@@ -377,7 +382,7 @@ export function DeliveryPreviewModal({
                 <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">
                   {fmtDate(delivery.task_date)}
                   {delivery.knight_name ? ` · ${delivery.knight_name}` : ""}
-                  {delivery.drop_recipient_name ? ` · → ${delivery.drop_recipient_name}` : ""}
+                  {recipients ? ` · → ${recipients}` : ""}
                 </p>
                 <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center", mt: 1.25 }}>
                   <Chip size="small" variant="outlined" label={orderId} />
@@ -520,7 +525,10 @@ function DeliveryActions({
 function DeliveryPreview({ delivery }: { delivery: Delivery }) {
   const { orderId, source } = orderMeta(delivery);
   const stops = getDeliveryStops(delivery);
-  const stopSummary = formatStopRouteSummary(stops);
+  const routePeople = formatRoutePeople(
+    { name: delivery.sender_name, location: delivery.pickup_location },
+    stops,
+  );
   const instructions = getDeliveryInstructions(delivery);
   const schedule = deliverySchedule(delivery);
 
@@ -528,7 +536,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
     <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.75fr)]">
       <section aria-label="Route">
         <h3 className="mb-4 text-sm font-semibold">
-          {stopSummary ?? routeAreaLabel(delivery.pickup_location, delivery.drop_location)}
+          {routePeople}
         </h3>
         <ol>
           <RouteStop
