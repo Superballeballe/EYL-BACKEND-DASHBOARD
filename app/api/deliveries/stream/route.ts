@@ -1,3 +1,4 @@
+import { isIncomingOrder } from "@/lib/orderAlert";
 import { sessionFromRequest } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -26,7 +27,10 @@ export async function GET(req: Request) {
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "deliveries" },
-          () => send("change"),
+          (change) => {
+            send("change");
+            if (isIncomingOrder(change)) send("order");
+          },
         )
         .on(
           "postgres_changes",
