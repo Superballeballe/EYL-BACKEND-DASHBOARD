@@ -259,16 +259,6 @@ export function areaLabel(address: string | null | undefined): string {
   return first || address.trim();
 }
 
-export function routeAreaLabel(
-  pickup: string | null | undefined,
-  drop: string | null | undefined,
-): string {
-  const from = areaLabel(pickup);
-  const to = areaLabel(drop);
-  if (from === "—" && to === "—") return "—";
-  return `${from} → ${to}`;
-}
-
 /** Duration as H:MM from pickup/drop actual times (datetime-local or legacy clock). */
 export function calcWorkingHours(
   pickup: string | null | undefined,

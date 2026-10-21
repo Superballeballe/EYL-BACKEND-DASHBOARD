@@ -29,9 +29,9 @@ import { EmptyState, FulfillmentBadge } from "@/components/ui";
 import RetryRefundButton from "@/components/RetryRefundButton";
 import { cancelledRefundPaise, formatPaise, refundStatusInfo } from "@/lib/refunds";
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
-import { fmtDatetimeLocal, money, routeAreaLabel, areaLabel } from "@/lib/format";
+import { fmtDatetimeLocal, money } from "@/lib/format";
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
-import { formatStopRouteSummary } from "@/lib/deliveryTaskBadges";
+import { formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { activateOnKey } from "@/lib/keyboard";
 import { formatDeliveryOrderId } from "@/lib/serial";
 import { FOCUS, gray, panelSx, shadow, tableShellSx } from "@/lib/surface";
@@ -86,12 +86,10 @@ function JobCard({
   mode: "pending" | "running";
   onPreview: (delivery: Delivery) => void;
 }) {
-  const stops = getDeliveryStops(d);
-  const stopSummary = formatStopRouteSummary(stops);
-  const recipients =
-    stops.length > 1
-      ? stops.map((stop) => stop.contactName).filter(Boolean).join(" · ")
-      : (d.drop_recipient_name ?? "");
+  const routePeople = formatRoutePeople(
+    { name: d.sender_name, location: d.pickup_location },
+    getDeliveryStops(d),
+  );
 
   return (
     <Box
@@ -120,6 +118,7 @@ function JobCard({
       <Typography
         variant="caption"
         noWrap
+        title={routePeople}
         sx={{
           display: "block",
           mt: 0.25,
@@ -129,16 +128,10 @@ function JobCard({
           textTransform: "uppercase",
         }}
       >
-        {stopSummary ?? routeAreaLabel(d.pickup_location, d.drop_location)}
+        {routePeople}
       </Typography>
-      {stopSummary ? (
-        <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-          Pickup · {areaLabel(d.pickup_location)}
-        </Typography>
-      ) : null}
       <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
         {formatDeliveryOrderId(d)}
-        {recipients ? ` · ${recipients}` : ""}
       </Typography>
       <DeliveryTaskBadges delivery={d} />
       {mode === "running" ? (
