@@ -85,6 +85,19 @@ export function getDeliveryStops(delivery: Pick<Delivery, "raw" | "app_order" | 
   ];
 }
 
+/** Who hands the parcel over: the app's pickup contact, else the sender on the delivery row. */
+export function getPickupContact(
+  delivery: Pick<Delivery, "raw" | "sender_name">,
+): { name: string | null; phone: string | null } {
+  const raw = delivery.raw && typeof delivery.raw === "object" ? (delivery.raw as Record<string, unknown>) : null;
+  const pickup = raw?.pickup && typeof raw.pickup === "object" ? (raw.pickup as StopRecord) : null;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+  return {
+    name: text(pickup?.contact_name) ?? text(delivery.sender_name),
+    phone: text(pickup?.contact_phone),
+  };
+}
+
 export function getDeliveryInstructions(
   delivery: Pick<Delivery, "raw" | "app_order">,
 ): DeliveryInstructions {
