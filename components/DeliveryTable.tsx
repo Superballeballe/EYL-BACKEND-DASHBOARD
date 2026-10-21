@@ -29,7 +29,7 @@ import { DeliveryStepItems, DialogRail, RailGroup, RailItem, RAIL_DIALOG_HEIGHT 
 import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/DeliveryLifecycleActions";
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
-import { getDeliveryInstructions, getDeliveryStops } from "@/lib/deliveryRouteDetails";
+import { getDeliveryInstructions, getDeliveryStops, getPickupContact } from "@/lib/deliveryRouteDetails";
 import { formatRecipients, formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
@@ -529,6 +529,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
     { name: delivery.sender_name, location: delivery.pickup_location },
     stops,
   );
+  const pickupContact = getPickupContact(delivery);
   const instructions = getDeliveryInstructions(delivery);
   const schedule = deliverySchedule(delivery);
 
@@ -544,6 +545,9 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
             location={delivery.pickup_location}
             scheduled={schedule.pickup}
             actualTime={delivery.pickup_actual_time}
+            person={pickupContact.name}
+            personRole="From"
+            phone={pickupContact.phone}
             instructions={instructions.pickup}
           />
           {stops.map((stop, index) => (
@@ -616,6 +620,7 @@ function RouteStop({
   scheduled,
   actualTime,
   person,
+  personRole = "To",
   phone,
   instructions,
   isReturn,
@@ -626,12 +631,13 @@ function RouteStop({
   scheduled: string | null;
   actualTime: string | null;
   person?: string | null;
+  personRole?: "From" | "To";
   phone?: string | null;
   instructions?: string | null;
   isReturn?: boolean;
   last?: boolean;
 }) {
-  const contact = [person ? `To ${person}` : null, phone].filter(Boolean).join(" · ");
+  const contact = [person ? `${personRole} ${person}` : null, phone].filter(Boolean).join(" · ");
 
   return (
     <li className="relative flex gap-3 pb-6 last:pb-0">
