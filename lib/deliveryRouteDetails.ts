@@ -64,7 +64,10 @@ function normalizeStop(stop: StopRecord, index: number, total: number): Delivery
 }
 
 /** All delivery stops from invoice metadata, or a single drop from the delivery row. */
-export function getDeliveryStops(delivery: Pick<Delivery, "raw" | "app_order" | "drop_location" | "drop_recipient_name" | "recipient_phone">): DeliveryStop[] {
+export function getDeliveryStops(
+  delivery: Pick<Delivery, "raw" | "app_order" | "drop_location" | "drop_recipient_name" | "recipient_phone"> &
+    Partial<Pick<Delivery, "drop_flat">>,
+): DeliveryStop[] {
   const meta = deliveryInvoiceMeta(delivery);
   const rawStops = meta?.stops;
   if (Array.isArray(rawStops) && rawStops.length > 0) {
@@ -76,7 +79,7 @@ export function getDeliveryStops(delivery: Pick<Delivery, "raw" | "app_order" | 
   return [
     {
       label: "Drop",
-      location: delivery.drop_location,
+      location: composeAddressLine({ apartment: delivery.drop_flat, line: delivery.drop_location }) || null,
       contactName: delivery.drop_recipient_name,
       contactPhone: delivery.recipient_phone,
       instructions: null,
@@ -85,16 +88,21 @@ export function getDeliveryStops(delivery: Pick<Delivery, "raw" | "app_order" | 
   ];
 }
 
-/** Who hands the parcel over: the app's pickup contact, else the sender on the delivery row. */
+/** The pickup address with the flat entered on the dashboard form first. */
+export function getPickupLocation(delivery: Pick<Delivery, "pickup_location"> & Partial<Pick<Delivery, "pickup_flat">>): string | null {
+  return composeAddressLine({ apartment: delivery.pickup_flat, line: delivery.pickup_location }) || null;
+}
+
+/** Who hands the parcel over: the contact entered on the dashboard, else the app's pickup contact, else the sender. */
 export function getPickupContact(
-  delivery: Pick<Delivery, "raw" | "sender_name">,
+  delivery: Pick<Delivery, "raw" | "sender_name"> & Partial<Pick<Delivery, "pickup_contact_name" | "pickup_contact_phone">>,
 ): { name: string | null; phone: string | null } {
   const raw = delivery.raw && typeof delivery.raw === "object" ? (delivery.raw as Record<string, unknown>) : null;
   const pickup = raw?.pickup && typeof raw.pickup === "object" ? (raw.pickup as StopRecord) : null;
   const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
   return {
-    name: text(pickup?.contact_name) ?? text(delivery.sender_name),
-    phone: text(pickup?.contact_phone),
+    name: text(delivery.pickup_contact_name) ?? text(pickup?.contact_name) ?? text(delivery.sender_name),
+    phone: text(delivery.pickup_contact_phone) ?? text(pickup?.contact_phone),
   };
 }
 

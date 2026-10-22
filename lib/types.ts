@@ -174,6 +174,9 @@ export type Delivery = {
   pickup_lng: number | null;
   pickup_time_window: string | null;
   pickup_actual_time: string | null;
+  pickup_flat: string | null;
+  pickup_contact_name: string | null;
+  pickup_contact_phone: string | null;
   drop_location: string | null;
   drop_lat: number | null;
   drop_lng: number | null;
@@ -181,6 +184,7 @@ export type Delivery = {
   recipient_phone: string | null;
   drop_time_window: string | null;
   drop_actual_time: string | null;
+  drop_flat: string | null;
   knight_id: string | null;
   knight_name: string | null;
   assignment_status: "assigned" | "cancelled";

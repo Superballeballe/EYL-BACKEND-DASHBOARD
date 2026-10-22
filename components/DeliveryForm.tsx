@@ -24,6 +24,10 @@ function toNumOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function validPhone(v: unknown) {
+  return String(v ?? "").replace(/\D/g, "").length >= 10 ? true : "Enter a valid 10-digit phone number";
+}
+
 const WIZARD_STEP_FIELDS: string[][] = [
   ["task_date", "booking_date", "mode_of_booking", "serial_no"],
   [
@@ -31,13 +35,14 @@ const WIZARD_STEP_FIELDS: string[][] = [
     "pickup_location",
     "pickup_time_window",
     "pickup_actual_time",
+    "pickup_contact_phone",
     "drop_location",
     "drop_time_window",
     "drop_actual_time",
     "drop_recipient_name",
     "recipient_phone",
   ],
-  ["knight_name", "fulfillment_status", "working_hours"],
+  ["knight_name", "fulfillment_status"],
   ["fees", "kms", "payment_status", "payment_mode", "final_bill_amount"],
 ];
 
@@ -480,19 +485,35 @@ ref,
           />
           <FieldError message={errors.pickup_time_window?.message as string | undefined} />
         </Field>
-        <Field label="Pickup actual" required>
-          <input
-            type="datetime-local"
-            className="input"
-            min={scheduleMin}
-            max={scheduleMax}
-            {...register("pickup_actual_time", {
-              required: "Pickup actual time is required",
-              validate: withinWorkingHours,
-            })}
-          />
-          <FieldError message={errors.pickup_actual_time?.message as string | undefined} />
+        <Field label="Flat / unit no.">
+          <input className="input" {...register("pickup_flat")} placeholder="e.g. 402, 4th floor" />
         </Field>
+        <Field label="Contact name">
+          <input className="input" {...register("pickup_contact_name")} placeholder="Person handing over" />
+        </Field>
+        <Field label="Contact phone">
+          <input
+            type="tel"
+            className="input"
+            {...register("pickup_contact_phone", {
+              validate: (v) => !String(v ?? "").trim() || validPhone(v),
+            })}
+            placeholder="e.g. 9876543210"
+          />
+          <FieldError message={errors.pickup_contact_phone?.message as string | undefined} />
+        </Field>
+        {mode === "edit" ? (
+          <Field label="Pickup actual">
+            <input
+              type="datetime-local"
+              className="input"
+              min={scheduleMin}
+              max={scheduleMax}
+              {...register("pickup_actual_time", { validate: withinWorkingHours })}
+            />
+            <FieldError message={errors.pickup_actual_time?.message as string | undefined} />
+          </Field>
+        ) : null}
       </Section>
 
       <Section title="Drop" variant={variant}>
@@ -517,6 +538,9 @@ ref,
           />
           <FieldError message={errors.drop_location?.message as string | undefined} />
         </Field>
+        <Field label="Flat / unit no." wide>
+          <input className="input" {...register("drop_flat")} placeholder="e.g. 217, 2nd floor" />
+        </Field>
         <Field label="Recipient name" required>
           <input
             className="input"
@@ -530,10 +554,7 @@ ref,
             className="input"
             {...register("recipient_phone", {
               required: "Phone number is required",
-              validate: (v) =>
-                String(v ?? "").replace(/\D/g, "").length >= 10
-                  ? true
-                  : "Enter a valid 10-digit phone number",
+              validate: validPhone,
             })}
             placeholder="e.g. 9876543210"
           />
@@ -552,19 +573,18 @@ ref,
           />
           <FieldError message={errors.drop_time_window?.message as string | undefined} />
         </Field>
-        <Field label="Drop actual" required>
-          <input
-            type="datetime-local"
-            className="input"
-            min={scheduleMin}
-            max={scheduleMax}
-            {...register("drop_actual_time", {
-              required: "Drop actual time is required",
-              validate: withinWorkingHours,
-            })}
-          />
-          <FieldError message={errors.drop_actual_time?.message as string | undefined} />
-        </Field>
+        {mode === "edit" ? (
+          <Field label="Drop actual">
+            <input
+              type="datetime-local"
+              className="input"
+              min={scheduleMin}
+              max={scheduleMax}
+              {...register("drop_actual_time", { validate: withinWorkingHours })}
+            />
+            <FieldError message={errors.drop_actual_time?.message as string | undefined} />
+          </Field>
+        ) : null}
       </Section>
       </>
       ) : null}
@@ -607,25 +627,20 @@ ref,
             Same status in dashboard and customer app
           </p>
         </Field>
-        <Field label="Working hours" required>
-          <input
-            type="hidden"
-            {...register("working_hours", {
-              validate: () =>
-                workingHoursLabel !== "—" ? true : "Enter pickup & drop actual times on Route step",
-            })}
-          />
-          <div
-            className="input flex items-center bg-[var(--surface-muted)] font-semibold"
-            aria-readonly
-          >
-            {workingHoursLabel}
-          </div>
-          <FieldError message={errors.working_hours?.message as string | undefined} />
-          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            Auto from pickup &amp; drop actual times (Route step)
-          </p>
-        </Field>
+        {mode === "edit" ? (
+          <Field label="Working hours">
+            <input type="hidden" {...register("working_hours")} />
+            <div
+              className="input flex items-center bg-[var(--surface-muted)] font-semibold"
+              aria-readonly
+            >
+              {workingHoursLabel}
+            </div>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              Auto from pickup &amp; drop actual times (Route step)
+            </p>
+          </Field>
+        ) : null}
       </Section>
       ) : null}
 
