@@ -1,4 +1,4 @@
-import { isIncomingOrder } from "@/lib/orderAlert";
+import { incomingOrderId, settledOrderId } from "@/lib/orderAlert";
 import { sessionFromRequest } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -29,13 +29,18 @@ export async function GET(req: Request) {
           { event: "*", schema: "public", table: "deliveries" },
           (change) => {
             send("change");
-            if (isIncomingOrder(change)) send("order");
+            const incoming = incomingOrderId(change);
+            if (incoming) send("order", incoming);
           },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "orders" },
-          () => send("change"),
+          (change) => {
+            send("change");
+            const settled = settledOrderId(change);
+            if (settled) send("settled", settled);
+          },
         )
         .on(
           "postgres_changes",
