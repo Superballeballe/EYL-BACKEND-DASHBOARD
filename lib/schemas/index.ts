@@ -105,6 +105,9 @@ export const deliverySchema = z.object({
   pickup_lng: nnum,
   pickup_time_window: nstr,
   pickup_actual_time: nstr,
+  pickup_flat: nstr,
+  pickup_contact_name: nstr,
+  pickup_contact_phone: nstr,
 
   drop_location: nstr,
   drop_lat: nnum,
@@ -113,6 +116,7 @@ export const deliverySchema = z.object({
   recipient_phone: nstr,
   drop_time_window: nstr,
   drop_actual_time: nstr,
+  drop_flat: nstr,
 
   knight_id: nuuid,
   knight_name: nstr,
@@ -180,14 +184,11 @@ export const createDeliverySchema = deliverySchema.superRefine((data, ctx) => {
   if (data.recipient_phone == null) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Phone number is required", path: ["recipient_phone"] });
   }
-  if (data.pickup_actual_time == null) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pickup actual time is required", path: ["pickup_actual_time"] });
-  } else if (!isWithinWorkingHours(data.pickup_actual_time)) {
+  // Actual times are stamped by the knight's pickup/drop actions, so a new delivery may not have them yet.
+  if (!isWithinWorkingHours(data.pickup_actual_time)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["pickup_actual_time"] });
   }
-  if (data.drop_actual_time == null) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Drop actual time is required", path: ["drop_actual_time"] });
-  } else if (!isWithinWorkingHours(data.drop_actual_time)) {
+  if (!isWithinWorkingHours(data.drop_actual_time)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: workingHoursError(), path: ["drop_actual_time"] });
   }
   if (data.fulfillment_status == null) {
@@ -195,9 +196,6 @@ export const createDeliverySchema = deliverySchema.superRefine((data, ctx) => {
   }
   if (data.fulfillment_status !== "cancelled" && data.knight_name == null) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Knight is required", path: ["knight_name"] });
-  }
-  if (data.working_hours == null && data.fulfillment_status !== "cancelled") {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Working hours could not be calculated", path: ["working_hours"] });
   }
   if (data.fees == null) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Fees is required", path: ["fees"] });

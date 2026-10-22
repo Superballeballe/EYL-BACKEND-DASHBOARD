@@ -29,7 +29,7 @@ import { DeliveryStepItems, DialogRail, RailGroup, RailItem, RAIL_DIALOG_HEIGHT 
 import DeliveryLifecycleActions, { type LifecycleResult } from "@/components/DeliveryLifecycleActions";
 import DeliveryTaskBadges from "@/components/DeliveryTaskBadges";
 import { FulfillmentBadge, PaymentBadge } from "@/components/ui";
-import { getDeliveryInstructions, getDeliveryStops, getPickupContact } from "@/lib/deliveryRouteDetails";
+import { getDeliveryInstructions, getDeliveryStops, getPickupContact, getPickupLocation } from "@/lib/deliveryRouteDetails";
 import { formatRecipients, formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
@@ -525,8 +525,9 @@ function DeliveryActions({
 function DeliveryPreview({ delivery }: { delivery: Delivery }) {
   const { orderId, source } = orderMeta(delivery);
   const stops = getDeliveryStops(delivery);
+  const pickupLocation = getPickupLocation(delivery);
   const routePeople = formatRoutePeople(
-    { name: delivery.sender_name, location: delivery.pickup_location },
+    { name: delivery.sender_name, location: pickupLocation },
     stops,
   );
   const pickupContact = getPickupContact(delivery);
@@ -542,7 +543,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
         <ol>
           <RouteStop
             title="Pickup"
-            location={delivery.pickup_location}
+            location={pickupLocation}
             scheduled={schedule.pickup}
             actualTime={delivery.pickup_actual_time}
             person={pickupContact.name}
