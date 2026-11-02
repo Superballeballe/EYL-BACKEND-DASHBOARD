@@ -24,7 +24,8 @@ export type WhatsappErrorCode =
   | "pickup_too_soon"
   | "pickup_too_far"
   | "not_payable"
-  | "deadline_passed";
+  | "deadline_passed"
+  | "picked_up";
 
 export class WhatsappError extends Error {
   constructor(
@@ -316,8 +317,8 @@ const PICKUP_WINDOW_DAYS = 30;
  * contract error, using the messages the EYL-APP guards raise:
  *   'pickup is outside the service area' / 'drop-off …' / 'route …' (22023, reprice_order)
  *   'no price band covers % km' (22023, eyl_distance_fare)
- *   'pickup time not allowed: pick a slot at least 2 hours away' (P0001,
- *      guard_client_pickup_time — also raised past the 30-day limit)
+ *   'pickup time not allowed: pick a slot at least 1 hour away' (P0001,
+ *      guard_client_pickup_time for WhatsApp bookings — also raised past the 30-day limit)
  *   'pickup time not allowed: pick an upcoming slot' (older guard)
  *   'payment window expired' / 'confirmation window has closed'
  * Plain snake_case tokens (outside_service_area, …) are matched too.
@@ -336,7 +337,7 @@ export function mapBookingError(
     return new WhatsappError(422, `Pick a pickup within the next ${PICKUP_WINDOW_DAYS} days.`, "pickup_too_far");
   }
   if (/pickup_too_soon/i.test(text)) {
-    return new WhatsappError(422, "That pickup is too soon. Pick a slot at least 2 hours away.", "pickup_too_soon");
+    return new WhatsappError(422, "That pickup is too soon. Pick a slot at least 1 hour away.", "pickup_too_soon");
   }
   if (/pickup time not allowed/i.test(text)) {
     const now = ctx.now ?? new Date();
@@ -344,7 +345,7 @@ export function mapBookingError(
     const tooFar = Number.isFinite(at) && at > now.getTime() + (PICKUP_WINDOW_DAYS - 1) * 86_400_000;
     return tooFar
       ? new WhatsappError(422, `Pick a pickup within the next ${PICKUP_WINDOW_DAYS} days.`, "pickup_too_far")
-      : new WhatsappError(422, "That pickup is too soon. Pick a slot at least 2 hours away.", "pickup_too_soon");
+      : new WhatsappError(422, "That pickup is too soon. Pick a slot at least 1 hour away.", "pickup_too_soon");
   }
   if (/deadline_passed|deadline passed|payment window (has )?(expired|closed)|confirmation window has closed/i.test(text)) {
     return new WhatsappError(422, "The payment window for this booking has closed.", "deadline_passed");
@@ -530,6 +531,47 @@ export async function loadOrderLink(db: Db, orderId: string): Promise<{ wa_id: s
     .maybeSingle();
   if (error) throw new WhatsappError(500, `Couldn't load the order: ${error.message}`);
   return data ? { wa_id: data.wa_id as string } : null;
+}
+
+export type WhatsappCancelResult = {
+  order_id: string;
+  order_code: string;
+  already_cancelled: boolean;
+  refund_status: string;
+  refund_amount: number;
+};
+
+const CANCEL_REASONS = new Set(["changed_plans", "ordered_by_mistake", "wrong_address", "knight_delayed", "duplicate", "other"]);
+
+/**
+ * POST /orders/:id/cancel — the customer cancels from the chat (whatsapp_cancel_order).
+ * Before pickup only; a paid order is refunded in full by the refund worker.
+ */
+export async function cancelWhatsappOrder(
+  db: Db,
+  orderId: string,
+  input: { wa_id: string; reason_code?: string | null; note?: string | null },
+): Promise<WhatsappCancelResult> {
+  const reason = input.reason_code && CANCEL_REASONS.has(input.reason_code) ? input.reason_code : "other";
+  const { data, error } = await db.rpc("whatsapp_cancel_order", {
+    p_order_id: orderId,
+    p_wa_id: input.wa_id,
+    p_reason_code: reason,
+    p_note: input.note ?? null,
+  });
+  if (error) throw new WhatsappError(500, `Couldn't cancel the order: ${error.message}`);
+  const r = (data ?? {}) as Record<string, unknown>;
+  if (r.ok !== true) {
+    if (r.code === "picked_up") throw new WhatsappError(409, String(r.message ?? "Already picked up."), "picked_up");
+    throw new WhatsappError(404, "Order not found");
+  }
+  return {
+    order_id: orderId,
+    order_code: String(r.order_code ?? ""),
+    already_cancelled: r.already_cancelled === true,
+    refund_status: String(r.refund_status ?? "none"),
+    refund_amount: Math.round(Number(r.refund_amount_paise ?? 0)) / 100,
+  };
 }
 
 /** POST /orders/:id/payment-link — only for WhatsApp orders. */
