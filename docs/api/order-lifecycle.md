@@ -63,7 +63,7 @@ sequenceDiagram
 
 **Live verified lineage:**
 
-- `sync_order_to_delivery` matches dashboard migration `0018`: payment is invoice-derived, coordinates and distance are copied, and knight-selected walker transport/fare is synced. [Migration](../../supabase/migrations/0018_walker_transport_from_knight.sql)
+- `sync_order_to_delivery` matches dashboard migration `0018`: payment is invoice-derived, coordinates and distance are copied, and (until EYL-APP cleanup `20261104150000`, which dropped `set_walker_transport`) knight-selected walker transport/fare was synced. [Migration](../../supabase/migrations/0018_walker_transport_from_knight.sql)
 - `finalize_order_on_invoice_paid` matches dashboard migration `0020`: it promotes a pending knight, clears the deadline, and synchronizes delivery payment/mode/status. [Migration](../../supabase/migrations/0020_payment_status_from_invoice.sql)
 - Repository migrations in the consumer app redefine the same functions at multiple timestamps. Apply order matters; filenames alone do not prove live behavior.
 
