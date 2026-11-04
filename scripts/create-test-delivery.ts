@@ -3,7 +3,6 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nextSerial } from "@/lib/server/serial";
-import { nextInvoiceNo } from "@/lib/server/invoice";
 import { resolveKnight } from "@/lib/server/roster";
 import { formatSerialCode } from "@/lib/serial";
 
@@ -52,7 +51,6 @@ async function main() {
     .maybeSingle();
 
   const serial = await nextSerial(db, "b2b");
-  const invoice = await nextInvoiceNo(db);
 
   const row = await resolveKnight({
     task_date: today,
@@ -79,7 +77,6 @@ async function main() {
     payment_mode: "cash",
     final_bill_amount: 350,
     billing_name: "Test Billing Client",
-    invoice_no: invoice.invoice_no,
     content: "Test parcel — documents",
     remark: "Auto-created test delivery",
     needs_review: false,

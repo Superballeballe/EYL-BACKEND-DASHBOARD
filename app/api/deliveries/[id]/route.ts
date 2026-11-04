@@ -29,7 +29,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if ("error" in parsed) return parsed.error;
   try {
     const { id } = await params;
-    const row = await resolveKnight(parsed.data);
+    // Invoice numbers are issued once by the database and never edited here.
+    const { invoice_no: _ignored, ...row } = await resolveKnight(parsed.data);
     const { data, error } = await supabaseAdmin()
       .from("deliveries")
       .update(row)
