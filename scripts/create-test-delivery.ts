@@ -1,4 +1,8 @@
-/** One-shot: npx tsx scripts/create-test-delivery.ts */
+/**
+ * One-shot: npx tsx scripts/create-test-delivery.ts
+ * Creates a real delivery: the database issues it the next GST invoice number
+ * (EYL-APP 20261104152000). Never run it against production.
+ */
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { supabaseAdmin } from "@/lib/supabase/admin";
