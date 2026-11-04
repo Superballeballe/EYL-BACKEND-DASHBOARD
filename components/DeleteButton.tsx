@@ -26,7 +26,9 @@ export default function DeleteButton({
       router.refresh();
     } else {
       setBusy(false);
-      alert("Delete failed");
+      // The server's reason, e.g. "Issued invoices must be cancelled with a credit note".
+      const data = await res.json().catch(() => ({}));
+      alert(typeof data?.error === "string" && data.error ? data.error : "Delete failed");
     }
   }
 
