@@ -24,6 +24,7 @@ import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import CurrencyRupeeOutlinedIcon from "@mui/icons-material/CurrencyRupeeOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
@@ -77,6 +78,7 @@ const SECTIONS: { title: string; links: NavLink[] }[] = [
       { href: "/rates", label: "Rate Cards", Icon: CreditCardOutlinedIcon },
       { href: "/coupons", label: "Coupons", Icon: ConfirmationNumberOutlinedIcon },
       { href: "/hub-contacts", label: "Customer care", Icon: PhoneInTalkOutlinedIcon },
+      { href: "/holidays", label: "Holidays", Icon: EventBusyOutlinedIcon },
       { href: "/invoices", label: "Tax invoices", Icon: DescriptionOutlinedIcon },
       { href: "/admin/users", label: "Team", Icon: ManageAccountsOutlinedIcon, adminOnly: true },
     ],

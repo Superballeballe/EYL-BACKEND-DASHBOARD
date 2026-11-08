@@ -25,7 +25,8 @@ export type WhatsappErrorCode =
   | "pickup_too_far"
   | "not_payable"
   | "deadline_passed"
-  | "picked_up";
+  | "picked_up"
+  | "not_accepting_orders";
 
 export class WhatsappError extends Error {
   constructor(
@@ -321,6 +322,8 @@ const PICKUP_WINDOW_DAYS = 30;
  *      guard_client_pickup_time for WhatsApp bookings — also raised past the 30-day limit)
  *   'pickup time not allowed: pick an upcoming slot' (older guard)
  *   'payment window expired' / 'confirmation window has closed'
+ *   'Not accepting orders today' / 'Not accepting orders on 9 Nov 2026' (P0001,
+ *      refuse_booking_on_holiday: a service holiday)
  * Plain snake_case tokens (outside_service_area, …) are matched too.
  */
 export function mapBookingError(
@@ -330,6 +333,10 @@ export function mapBookingError(
   const message = String(error.message ?? "");
   const text = `${message} ${error.details ?? ""} ${error.hint ?? ""}`;
 
+  const closed = /Not accepting orders (today|on \d{1,2} [A-Za-z]{3} \d{4})/i.exec(text);
+  if (closed) {
+    return new WhatsappError(422, closed[0].replace(/^not/i, "Not"), "not_accepting_orders");
+  }
   if (/outside[ _]the[ _]service[ _]area|outside_service_area|no price band covers/i.test(text)) {
     return new WhatsappError(422, "That address is outside our service area.", "outside_service_area");
   }

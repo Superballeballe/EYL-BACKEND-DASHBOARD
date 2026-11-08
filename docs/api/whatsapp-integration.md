@@ -31,6 +31,7 @@ Errors use the `lib/api.ts` shape `{ error, details?, code? }`:
 | `unsupported_country` | `wa_id` isn't `91` followed by a 10-digit Indian mobile number |
 | `outside_service_area` | `reprice_order` (`pickup/drop-off/route is outside the service area`), `eyl_distance_fare` (`no price band covers … km`), or `quote_booking` (`outside_service_area`); all 22023 |
 | `pickup_too_soon` | `guard_client_pickup_time`: `pickup time not allowed: …` with a slot less than 1 hour away when the order is created (no grace; EYL-APP `20261102130000_thirty_minute_slots`) |
+| `not_accepting_orders` | `refuse_booking_on_holiday`: `Not accepting orders today` (a service holiday) or `Not accepting orders on 9 Nov 2026` (pickup on one). `error` carries that text. Check `GET /availability` first. |
 | `pickup_too_far` | The same guard with the slot more than about 29 days away (the guard has one message for both limits) |
 | `deadline_passed` | Payment window expired or confirmation window closed (`payment_window_closed`, `slot_too_soon`, `deadline_passed` from the edge function) |
 | `not_payable` | The booking can't take payment (`not_payable`, `not_pending`, `already_paid`, or any other 409/422 from the edge function) |
