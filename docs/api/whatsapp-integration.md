@@ -20,7 +20,7 @@ Errors use the `lib/api.ts` shape `{ error, details?, code? }`:
 | 400 | Invalid JSON, a body or query that fails zod validation ([`lib/schemas/whatsapp.ts`](../../lib/schemas/whatsapp.ts)), or a malformed id |
 | 401 | Missing or wrong integration key |
 | 404 | The order doesn't exist or wasn't placed through WhatsApp |
-| 409 | The order `id` is already used by another customer or wa_id |
+| 409 | The order `id` is already used by another customer or wa_id; or `code: picked_up` from `POST /orders/:id/cancel` after pickup |
 | 422 | A business rule refused the request; see `code` below |
 | 500 | Server, database or edge-function failure |
 
@@ -30,7 +30,7 @@ Errors use the `lib/api.ts` shape `{ error, details?, code? }`:
 |---|---|
 | `unsupported_country` | `wa_id` isn't `91` followed by a 10-digit Indian mobile number |
 | `outside_service_area` | `reprice_order` (`pickup/drop-off/route is outside the service area`), `eyl_distance_fare` (`no price band covers … km`), or `quote_booking` (`outside_service_area`); all 22023 |
-| `pickup_too_soon` | `guard_client_pickup_time`: `pickup time not allowed: …` with a slot less than 1.5 h away |
+| `pickup_too_soon` | `guard_client_pickup_time`: `pickup time not allowed: …` with a slot less than 1 hour away when the order is created (no grace; EYL-APP `20261102130000_thirty_minute_slots`) |
 | `pickup_too_far` | The same guard with the slot more than about 29 days away (the guard has one message for both limits) |
 | `deadline_passed` | Payment window expired or confirmation window closed (`payment_window_closed`, `slot_too_soon`, `deadline_passed` from the edge function) |
 | `not_payable` | The booking can't take payment (`not_payable`, `not_pending`, `already_paid`, or any other 409/422 from the edge function) |
@@ -44,6 +44,7 @@ Errors use the `lib/api.ts` shape `{ error, details?, code? }`:
 | `POST /orders` | Resolves the customer → `create_booking_as(p_user_id, p_payload)` → inserts `whatsapp_order_links` (a duplicate is ignored) → invokes `razorpay-payment-link {order_id, action: "create"}`. Returns `201`, or `200` on a replay of the same `id`. |
 | `GET /orders?wa_id=&limit=` | Up to `limit` (1–20, default 5) linked orders, newest first: `{data: OrderView[]}`. |
 | `GET /orders/:id` | One `OrderView`. Orders without a `whatsapp_order_links` row return `404`. |
+| `POST /orders/:id/cancel` | Body `{wa_id, reason_code?, note?}`. The customer cancels from the chat: `whatsapp_cancel_order` (before pickup; a paid order gets a full refund through the refund worker) → `{order_id, order_code, already_cancelled, refund_status, refund_amount}` (rupees). 404 if the order isn't this `wa_id`'s, 409 `picked_up` after pickup. |
 | `POST /orders/:id/payment-link` | Linked orders only. Invokes `razorpay-payment-link` (`create`), which returns the active link or issues a new one after checking payability again → `{payment_url, payment_link_id, expires_at, total}`. |
 | `GET /events?after=&limit=` | `integration_order_events` with `id > after` (default `0`), in id order, `limit` 1–200 (default 100), joined with `orders.order_code`. `next_cursor` is the last returned id, or `after` if no events are returned. |
 
@@ -73,7 +74,8 @@ Errors use the `lib/api.ts` shape `{ error, details?, code? }`:
 These objects are created by EYL-APP migrations, not by this repo:
 
 - the tables `whatsapp_customers`, `whatsapp_order_links(order_id, wa_id, recipient_alerts_consent)` and `integration_order_events`;
-- the RPCs `create_booking_as` and `quote_booking`;
+- the RPCs `create_booking_as`, `quote_booking` and `whatsapp_cancel_order`;
+- `whatsapp_cancel_order` comes from `20261103120000_whatsapp_chat_cancel.sql`; the booking rules are the app's own: 30-minute slots from 1 hour ahead with no grace and a confirm deadline of slot − 15 minutes (`20261102130000`), and auto-confirm on payment for the first 20 orders per pickup day and 3 per slot (`20261102150000`);
 - the edge function `razorpay-payment-link`.
 
 The routes return `500` until these objects exist in the target project.

@@ -14,6 +14,7 @@ import {
 } from "./schemas/whatsapp";
 import {
   buildCreateBookingPayload,
+  cancelWhatsappOrder,
   createWhatsappOrder,
   ensureCustomer,
   listWhatsappEvents,
@@ -392,7 +393,7 @@ describe("mapBookingError", () => {
   });
 
   it("splits the pickup-time guard into too soon / too far", () => {
-    const msg = "pickup time not allowed: pick a slot at least 2 hours away";
+    const msg = "pickup time not allowed: pick a slot at least 1 hour away";
     assert.equal(code(msg, "P0001", "2026-10-16T11:00:00Z"), "pickup_too_soon");
     assert.equal(code(msg, "P0001", "2026-11-20T11:00:00Z"), "pickup_too_far");
     assert.equal(code("pickup time not allowed: pick an upcoming slot"), "pickup_too_soon");
@@ -658,5 +659,30 @@ describe("listWhatsappEvents", () => {
   it("keeps the input cursor when there is nothing new", async () => {
     const { db } = fakeDb({});
     assert.deepEqual(await listWhatsappEvents(db, "42", 100), { data: [], next_cursor: "42" });
+  });
+});
+
+describe("cancelWhatsappOrder", () => {
+  it("cancels through whatsapp_cancel_order and reports the refund in rupees", async () => {
+    const { db, calls } = fakeDb({
+      rpc: () => ({ data: { ok: true, order_code: "EYL1", already_cancelled: false, refund_status: "pending", refund_amount_paise: 24900 } }),
+    });
+    const r = await cancelWhatsappOrder(db, ORDER_ID, { wa_id: "919812345678", reason_code: "changed_plans" });
+    assert.deepEqual(r, { order_id: ORDER_ID, order_code: "EYL1", already_cancelled: false, refund_status: "pending", refund_amount: 249 });
+    assert.deepEqual(calls.rpc[0], [
+      "whatsapp_cancel_order",
+      { p_order_id: ORDER_ID, p_wa_id: "919812345678", p_reason_code: "changed_plans", p_note: null },
+    ]);
+  });
+  it("sends unknown reasons as other", async () => {
+    const { db, calls } = fakeDb({ rpc: () => ({ data: { ok: true, refund_amount_paise: 0 } }) });
+    await cancelWhatsappOrder(db, ORDER_ID, { wa_id: "919812345678", reason_code: "ops_cancelled" });
+    assert.equal(calls.rpc[0][1].p_reason_code, "other");
+  });
+  it("maps picked_up to 409 and other refusals to 404", async () => {
+    const picked = fakeDb({ rpc: () => ({ data: { ok: false, code: "picked_up", message: "Already picked up." } }) });
+    await assert.rejects(cancelWhatsappOrder(picked.db, ORDER_ID, { wa_id: "919812345678" }), (e: WhatsappError) => e.status === 409 && e.code === "picked_up");
+    const missing = fakeDb({ rpc: () => ({ data: { ok: false, code: "not_found" } }) });
+    await assert.rejects(cancelWhatsappOrder(missing.db, ORDER_ID, { wa_id: "919812345678" }), (e: WhatsappError) => e.status === 404);
   });
 });
