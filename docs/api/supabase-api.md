@@ -55,7 +55,6 @@ The knight writes operational statuses directly to `orders`: `picked_up`, then `
 | `update_confirmed_drop(p_order_id,p_drop)` | Consumer | Changes destination for eligible confirmed order and updates cancellation/price consequences defined by DB. |
 | `set_return_instructions(p_order_id,p_instructions)` | Consumer | Stores round-trip return instructions. |
 | `knight_confirm_pickup(p_order_id)` | Knight | Holds the open order as `pending_knight_id` and starts/restarts a three-minute payment window. |
-| `set_walker_transport(p_order_id,p_mode,p_cab_fare_inr)` | Assigned knight | Stores `cab` or `public_transit`; syncs fare/mode to dashboard delivery. |
 
 Call sites: [consumer booking](../../../EYL-APP/src/services/bookingService.js) and [knight orders](../../../EYL-KNIGHT-APP/src/services/authService.js).
 

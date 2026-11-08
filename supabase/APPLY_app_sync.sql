@@ -1,3 +1,10 @@
+-- ############################################################
+-- STALE — do not apply. EYL-APP supabase/migrations is the source of
+-- truth (last synced 2026-06-18, commit 0ae81e3). Applying this would
+-- re-create the customer "insert own orders" policy removed by
+-- EYL-APP migration 20261104120000.
+-- ############################################################
+
 -- =====================================================================
 -- APPLY_app_sync.sql  —  ONE-SHOT FIX for "deliveries from the app
 -- aren't showing up in the dashboard".

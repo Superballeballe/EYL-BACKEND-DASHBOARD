@@ -1,10 +1,14 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deliveryUpdateSchema } from "@/lib/schemas";
 import { resolveKnight } from "@/lib/server/roster";
-import { badRequest, forbidden, notFound, ok, parseBody, serverError, unauthorized } from "@/lib/api";
+import { badRequest, conflict, forbidden, notFound, ok, parseBody, serverError, unauthorized } from "@/lib/api";
 import { requireAdmin } from "@/lib/server/session";
 
 export const runtime = "nodejs";
+
+// EYL-APP 20261104159000: the database refuses to delete anything carrying an
+// issued tax invoice (GST: cancel it with a credit note instead).
+const ISSUED_INVOICE = "Issued invoices must be cancelled with a credit note";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -29,7 +33,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if ("error" in parsed) return parsed.error;
   try {
     const { id } = await params;
-    const row = await resolveKnight(parsed.data);
+    // Invoice numbers are issued once by the database and never edited here.
+    const { invoice_no: _ignored, ...row } = await resolveKnight(parsed.data);
     const { data, error } = await supabaseAdmin()
       .from("deliveries")
       .update(row)
@@ -59,6 +64,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
     if (!delivery) return ok({ ok: true });
 
     const { error } = await db.rpc("delete_delivery", { p_delivery_id: id });
+    if (error?.message === ISSUED_INVOICE) return conflict(ISSUED_INVOICE, "ISSUED_INVOICE");
     if (error) return serverError(error);
     return ok({ ok: true });
   } catch (e) {

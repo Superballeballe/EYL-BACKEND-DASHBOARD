@@ -5,7 +5,6 @@ import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { calcWorkingHours, isWithinWorkingHours, money, toDatetimeLocalValue, workDayEndInput, workDayStartInput, workingHoursError } from "@/lib/format";
 import { formatSerialCode } from "@/lib/serial";
-import { formatInvoiceNo } from "@/lib/invoice";
 import LocationPicker from "@/components/LocationPicker";
 
 type KnightOpt = { id: string; display_name: string };
@@ -247,21 +246,6 @@ ref,
       initial.app_order_id,
     );
   }, [mode, initial]);
-
-  useEffect(() => {
-    if (mode !== "new") return;
-    let cancelled = false;
-    fetch("/api/deliveries/next-invoice")
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled || !d?.invoice_no) return;
-        setValue("invoice_no", d.invoice_no);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, setValue]);
 
   useEffect(() => {
     if (mode !== "new") return;
@@ -760,14 +744,13 @@ ref,
             </div>
           ) : (
             <>
-              <input type="hidden" {...register("invoice_no")} />
               <div
                 className="input flex items-center bg-[var(--surface-muted)] font-semibold tracking-wide"
                 aria-readonly
               >
-                {invoiceNo?.trim() ? invoiceNo : formatInvoiceNo(null)}
+                —
               </div>
-              <p className="mt-1 text-xs text-[var(--muted-foreground)]">Auto-assigned · EYLINV</p>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)]">Assigned when you save · EYL/YY-YY/NNNNNN</p>
             </>
           )}
         </Field>

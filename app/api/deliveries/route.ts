@@ -2,7 +2,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deliverySchema, createDeliverySchema } from "@/lib/schemas";
 import { resolveKnight } from "@/lib/server/roster";
 import { nextSerial } from "@/lib/server/serial";
-import { nextInvoiceNo } from "@/lib/server/invoice";
 import { created, ok, parseBody, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -72,10 +71,10 @@ export async function POST(req: Request) {
       const serial = await nextSerial(db, row.mode_of_booking);
       row = { ...row, serial_no: serial.serial_no };
     }
-    if (!row.invoice_no?.trim()) {
-      const invoice = await nextInvoiceNo(db);
-      row = { ...row, invoice_no: invoice.invoice_no };
-    }
+    // The database issues the invoice number on insert (issue_invoice_number,
+    // EYL-APP 20261104152000); whatever the request carried is not sent.
+    const { invoice_no: _ignored, ...withoutInvoiceNo } = row;
+    row = withoutInvoiceNo as typeof row;
     const { data, error } = await db.from("deliveries").insert(row).select().single();
     if (error) return serverError(error);
     return created(data);
