@@ -392,6 +392,16 @@ describe("mapBookingError", () => {
     assert.equal(code("outside_service_area", "22023"), "outside_service_area");
   });
 
+  it("maps a service holiday to not_accepting_orders with the database's own words", () => {
+    const today = mapBookingError({ code: "P0001", message: "Not accepting orders today" });
+    assert.equal(today.status, 422);
+    assert.equal(today.code, "not_accepting_orders");
+    assert.equal(today.message, "Not accepting orders today");
+    const onDay = mapBookingError({ code: "P0001", message: "Not accepting orders on 9 Nov 2026" });
+    assert.equal(onDay.code, "not_accepting_orders");
+    assert.equal(onDay.message, "Not accepting orders on 9 Nov 2026");
+  });
+
   it("splits the pickup-time guard into too soon / too far", () => {
     const msg = "pickup time not allowed: pick a slot at least 1 hour away";
     assert.equal(code(msg, "P0001", "2026-10-16T11:00:00Z"), "pickup_too_soon");

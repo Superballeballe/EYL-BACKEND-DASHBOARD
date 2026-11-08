@@ -84,6 +84,9 @@ Body field definitions are in [`lib/schemas/index.ts`](../../lib/schemas/index.t
 | Cookie/API key | `GET /api/hub-contacts` | `active=true` | Customer care contacts ("Urgent, connect with us" in the app; it shows the first active row) in app order (`sort_order`, then `label`). [Source](../../app/api/hub-contacts/route.ts) |
 | Cookie/API key | `POST /api/hub-contacts` | `{label,phone,description?,sort_order?,active?}` | Creates contact (`201`). Phone is normalised to E.164 (spaces/dashes dropped). Saving a contact as active turns every other contact off, so only one is active. |
 | Cookie/API key | `PATCH/DELETE /api/hub-contacts/:id` | Patch: any contact fields | Update (same checks; a contact saved as active turns the others off) or delete. [Source](../../app/api/hub-contacts/[id]/route.ts) |
+| Cookie/API key | `GET /api/holidays` | — | Closed days (`service_holidays`) from today (IST) on. [Source](../../app/api/holidays/route.ts) |
+| Session cookie | `POST /api/holidays` | `{day: 'YYYY-MM-DD', note?}` | Closes a day (today up to a year ahead): the database then refuses every booking that day and any pickup on it; the app, WhatsApp bot and knight app show it. `409` if already closed. `created_by` = the signed-in user. |
+| Session cookie | `DELETE /api/holidays/:day` | — | Reopens the day; `404` if it wasn't closed. [Source](../../app/api/holidays/[day]/route.ts) |
 | Cookie/API key | `GET /api/salaries` | `knight_id`, `month` | Salaries with knight. [Source](../../app/api/salaries/route.ts) |
 | Cookie/API key | `POST /api/salaries` | `{knight_id,month:YYYY-MM,travel,salary,total?}` | Upserts by knight/month; derives total when omitted (`201`). |
 | Cookie/API key | `GET /api/lineup` | Required `date=YYYY-MM-DD` | `{work_day,assignments}`. [Source](../../app/api/lineup/route.ts) |
@@ -108,6 +111,7 @@ All require `x-integration-key` (else `401`); a session cookie or `API_KEY` does
 | Method and path | Request | Response and side effects |
 |---|---|---|
 | `POST /api/integrations/whatsapp/customers` | `{wa_id, name?}` | `{user_id, created, phone10, name}`; creates a phone-confirmed auth user if needed and upserts `whatsapp_customers`. [Source](../../app/api/integrations/whatsapp/customers/route.ts) |
+| `GET /api/integrations/whatsapp/availability` | None | `{accepting, closed_today, closed_days[], message}`: closed days ('YYYY-MM-DD' IST, today on) from the Holidays page; `message` is customer copy when closed today. [Source](../../app/api/integrations/whatsapp/availability/route.ts) |
 | `POST /api/integrations/whatsapp/quote` | `{pickup, stops[], round_trip, delicate}` | `quote_booking` amounts. [Source](../../app/api/integrations/whatsapp/quote/route.ts) |
 | `POST /api/integrations/whatsapp/orders` | Contract order body (idempotent on `id`) | `create_booking_as` → `whatsapp_order_links` → `razorpay-payment-link`; `201`, or `200` on replay. [Source](../../app/api/integrations/whatsapp/orders/route.ts) |
 | `GET /api/integrations/whatsapp/orders?wa_id=&limit=` | Query | `{data: OrderView[]}`, newest first. |
