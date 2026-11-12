@@ -1,4 +1,4 @@
-import { incomingOrderId, settledOrderId } from "@/lib/orderAlert";
+import { subscribeDeliveriesStream } from "@/lib/server/deliveriesStream";
 import { sessionFromRequest } from "@/lib/server/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -20,43 +20,33 @@ export async function GET(req: Request) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
       };
 
-      const keepalive = setInterval(() => send("ping"), 30_000);
       const db = supabaseAdmin();
-      const channel = db
-        .channel(`deliveries-stream-${session.userId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "deliveries" },
-          (change) => {
-            send("change");
-            const incoming = incomingOrderId(change);
-            if (incoming) send("order", incoming);
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "orders" },
-          (change) => {
-            send("change");
-            const settled = settledOrderId(change);
-            if (settled) send("settled", settled);
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "invoices" },
-          () => send("change"),
-        )
-        .subscribe();
+      const keepalive = setInterval(() => send("ping"), 30_000);
 
-      send("ready");
-
-      req.signal.addEventListener("abort", () => {
+      const shutdown = () => {
+        if (closed) return;
         closed = true;
         clearInterval(keepalive);
         void db.removeChannel(channel);
         controller.close();
+      };
+
+      const channel = subscribeDeliveriesStream(db, session.userId, {
+        change: () => send("change"),
+        order: (orderId) => send("order", orderId),
+        settled: (orderId) => send("settled", orderId),
+        // A dead subscription would keep pinging with no events, so the order
+        // sound goes quiet with nothing to show for it. End the response
+        // instead: the browser's EventSource reconnects with a fresh channel.
+        down: (status, err) => {
+          if (closed) return;
+          console.error(`[deliveries-stream] realtime ${status}; closing so the browser reconnects`, err ?? "");
+          shutdown();
+        },
       });
+
+      send("ready");
+      req.signal.addEventListener("abort", shutdown);
     },
   });
 
