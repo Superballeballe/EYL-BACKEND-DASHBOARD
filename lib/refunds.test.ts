@@ -46,6 +46,7 @@ describe("refund status", () => {
   it("names refund origins", () => {
     assert.equal(refundOriginLabel("rule_a_not_confirmed"), "Not confirmed within 30 min");
     assert.equal(refundOriginLabel("rule_b_paid_after_cancel"), "Paid after cancel");
+    assert.equal(refundOriginLabel("rule_c_no_knight"), "No knight for the pickup slot");
     assert.equal(refundOriginLabel("ops"), "Ops");
     assert.equal(refundOriginLabel("new_thing"), "new_thing");
   });
@@ -55,6 +56,10 @@ describe("refund status", () => {
     assert.equal(originOfCancellation({ was_confirmed: true }), "confirmed_cancel");
     assert.equal(originOfCancellation({ reason_label: "Paid after cancellation" }), "rule_b_paid_after_cancel");
     assert.equal(originOfCancellation({ reason_code: "not_confirmed" }), "rule_a_not_confirmed");
+    assert.equal(
+      originOfCancellation({ reason_code: "no_knight_available", was_confirmed: true }),
+      "rule_c_no_knight",
+    );
     assert.equal(originOfCancellation({ reason_code: "changed_plans" }), "customer_cancel");
     assert.equal(originOfCancellation({ reason_code: "ops_cancelled", was_confirmed: true }), "ops_cancel");
     assert.equal(originOfCancellation({ reason_code: "not_confirmed", was_confirmed: true }), "rule_a_not_confirmed");
