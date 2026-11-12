@@ -85,6 +85,7 @@ export function ledgerStatusInfo(status: string | null | undefined): { label: st
 const ORIGIN_LABELS: Record<string, string> = {
   rule_a_not_confirmed: "Not confirmed within 30 min",
   rule_b_paid_after_cancel: "Paid after cancel",
+  rule_c_no_knight: "No knight for the pickup slot",
   customer_cancel: "Customer cancelled",
   confirmed_cancel: "Confirmed order cancelled",
   ops: "Ops",
@@ -101,7 +102,8 @@ export function refundOriginLabel(origin: string | null | undefined): string {
 
 /**
  * Same rule as public.refund_origin_of, for rows the ledger has not seen
- * (e.g. before the 20261012150000 migration is applied). Mirrors 20261012190000.
+ * (e.g. before the 20261012150000 migration is applied). Mirrors the app
+ * repo's 20261112113000_no_knight_auto_refund.sql.
  */
 export function originOfCancellation(row: {
   reason_code?: string | null;
@@ -115,6 +117,7 @@ export function originOfCancellation(row: {
     return "rule_b_paid_after_cancel";
   }
   if (row.reason_code === "not_confirmed") return "rule_a_not_confirmed";
+  if (row.reason_code === "no_knight_available") return "rule_c_no_knight";
   if (row.was_confirmed) return "confirmed_cancel";
   return "customer_cancel";
 }
