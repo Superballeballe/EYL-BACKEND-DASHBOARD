@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
-import { incomingOrderId, settledOrderId } from "@/lib/orderAlert";
+import { alertKey, incomingOrderId, settledOrderId } from "@/lib/orderAlert";
 
 export type DeliveriesStreamHandlers = {
   /** Any change to deliveries, orders or invoices: the page should refresh. */
   change: () => void;
-  /** A customer order arrived: ring (components/NewOrderAlert.tsx). */
-  order: (orderId: string) => void;
+  /**
+   * A customer order arrived: ring (components/NewOrderAlert.tsx) under this key,
+   * the order id, or "plan:<id>" once for a delivery plan (see alertKey).
+   */
+  order: (key: string) => void;
   /** That order was confirmed, given a knight or cancelled: stop ringing. */
   settled: (orderId: string) => void;
   /** The realtime subscription failed or closed; no more events will arrive. */
@@ -27,12 +30,24 @@ export function subscribeDeliveriesStream(
   userId: string,
   handlers: DeliveriesStreamHandlers,
 ): RealtimeChannel {
+  const rungPlans = new Set<string>();
+  // Whether the new order is a plan day is on the order, not on its delivery
+  // row: read it rather than rely on which realtime event arrives first.
+  const ring = async (orderId: string) => {
+    const { data, error } = await db.from("orders").select("plan_id").eq("id", orderId).maybeSingle();
+    if (error) {
+      // Before the plans migration there is no plan_id: every order rings as before.
+      console.warn("[deliveries-stream] could not tell whether the order is a plan day; ringing for it:", error.message);
+    }
+    const key = alertKey(orderId, error ? null : ((data?.plan_id as string | null | undefined) ?? null), rungPlans);
+    if (key) handlers.order(key);
+  };
   return db
     .channel(`deliveries-stream-${userId}-${randomUUID()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "deliveries" }, (change) => {
       handlers.change();
       const incoming = incomingOrderId(change);
-      if (incoming) handlers.order(incoming);
+      if (incoming) void ring(incoming);
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (change) => {
       handlers.change();

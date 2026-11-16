@@ -33,7 +33,7 @@ import { getDeliveryInstructions, getDeliveryStops, getPickupContact, getPickupL
 import { formatRecipients, formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
-import { formatDeliveryOrderId, serialPrefix } from "@/lib/serial";
+import { formatDeliveryOrderId, formatDeliverySource } from "@/lib/serial";
 import { deliverySchedule } from "@/lib/deliverySchedule";
 import { effectiveFulfillmentStatus, lifecycleStage } from "@/lib/deliveryStatus";
 import type { Delivery } from "@/lib/types";
@@ -147,9 +147,7 @@ export default function DeliveryTable({
                     {formatDeliveryOrderId(delivery)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                    {serialPrefix(delivery.mode_of_booking, delivery.app_order_id) === "APPEYL"
-                      ? "App"
-                      : "Manual"}
+                    {formatDeliverySource(delivery)}
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -240,7 +238,7 @@ const EDIT_FORM_ID = "edit-delivery-form";
 
 function orderMeta(delivery: Delivery) {
   const orderId = formatDeliveryOrderId(delivery);
-  const source = serialPrefix(delivery.mode_of_booking, delivery.app_order_id) === "APPEYL" ? "App" : "Manual";
+  const source = formatDeliverySource(delivery);
   return { orderId, source };
 }
 

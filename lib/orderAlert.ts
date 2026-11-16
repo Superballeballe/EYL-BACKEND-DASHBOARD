@@ -24,6 +24,26 @@ export function incomingOrderId(change: { eventType: string; new: Record<string,
 }
 
 /**
+ * What a new app order rings under, or null for no ring.
+ *
+ * A delivery plan is paid once and books every one of its days at that moment,
+ * each already paid and confirmed (EYL-APP migration 20261114120000). Ringing
+ * per day would ring 30 times for a 30-day plan, for days with nothing to do
+ * yet. A plan rings once, under "plan:<id>", for its first day this stream
+ * sees; its other days stay quiet. `rungPlans` is that stream's memory of the
+ * plans it has rung for, and is updated here.
+ *
+ * Nothing settles a plan's ring (its days arrive confirmed), so it runs for
+ * ORDER_ALERT_RING_MS and stops on its own.
+ */
+export function alertKey(orderId: string, planId: string | null, rungPlans: Set<string>): string | null {
+  if (!planId) return orderId;
+  if (rungPlans.has(planId)) return null;
+  rungPlans.add(planId);
+  return `plan:${planId}`;
+}
+
+/**
  * The order whose alert should stop, from a realtime `orders` change: it was
  * confirmed, given a knight, cancelled or deleted. Null for any other change.
  *

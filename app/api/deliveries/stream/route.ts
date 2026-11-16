@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
       const channel = subscribeDeliveriesStream(db, session.userId, {
         change: () => send("change"),
-        order: (orderId) => send("order", orderId),
+        order: (key) => send("order", key),
         settled: (orderId) => send("settled", orderId),
         // A dead subscription would keep pinging with no events, so the order
         // sound goes quiet with nothing to show for it. End the response
