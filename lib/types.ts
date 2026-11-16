@@ -226,6 +226,8 @@ export type Delivery = {
     confirm_deadline_at?: string | null;
     pickup_instructions?: string | null;
     delivery_instructions?: string | null;
+    /** The delivery plan this order is a day of (PLN-0042), or null for a single booking. */
+    plan_code?: string | null;
     invoices?:
       | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }
       | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }[]

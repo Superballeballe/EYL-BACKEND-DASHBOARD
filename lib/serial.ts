@@ -30,6 +30,17 @@ export function formatDeliveryOrderId(delivery: {
   return formatSerialCode(delivery.mode_of_booking, delivery.serial_no, delivery.app_order_id);
 }
 
+/** Where a delivery came from, under its order id: "App", "App · Plan PLN-0042" or "Manual". */
+export function formatDeliverySource(delivery: {
+  mode_of_booking?: "b2b" | "online" | null;
+  app_order_id?: string | null;
+  app_order?: { plan_code?: string | null } | null;
+}): string {
+  if (serialPrefix(delivery.mode_of_booking, delivery.app_order_id) !== "APPEYL") return "Manual";
+  const plan = delivery.app_order?.plan_code?.trim();
+  return plan ? `App · Plan ${plan}` : "App";
+}
+
 /** APPEYL-12 / MANEYL-5 / plain digits → serial number for search. */
 export function parseSerialQuery(q: string): number | null {
   const trimmed = q.trim();

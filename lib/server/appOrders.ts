@@ -37,9 +37,10 @@ async function enrichAppOrdersWithRouteMeta(
   if (orders.length === 0) return orders;
   const ids = orders.map((order) => order.id);
 
-  const [{ data: invoices }, { data: orderRows }] = await Promise.all([
+  const [{ data: invoices }, { data: orderRows }, planCodeByOrder] = await Promise.all([
     db.from("invoices").select("order_id, payment_status, total_amount, metadata").in("order_id", ids),
     db.from("orders").select("id, pickup_instructions, delivery_instructions").in("id", ids),
+    loadPlanCodes(db, ids),
   ]);
 
   const invoiceByOrder = new Map<
@@ -65,6 +66,7 @@ async function enrichAppOrdersWithRouteMeta(
       ...order,
       pickup_instructions: instructions?.pickup_instructions ?? order.pickup_instructions ?? null,
       delivery_instructions: instructions?.delivery_instructions ?? order.delivery_instructions ?? null,
+      plan_code: planCodeByOrder.get(order.id) ?? null,
       invoices: invoice
         ? {
             payment_status: invoice.payment_status ?? existing?.payment_status ?? null,
@@ -74,6 +76,33 @@ async function enrichAppOrdersWithRouteMeta(
         : order.invoices ?? existing ?? null,
     };
   });
+}
+
+/**
+ * The delivery plan code of each order that is a plan day (EYL-APP migration
+ * 20261114120000). Before that migration orders have no plan_id: no codes,
+ * logged, and the rows still load.
+ */
+async function loadPlanCodes(db: ReturnType<typeof supabaseAdmin>, orderIds: string[]): Promise<Map<string, string>> {
+  const codes = new Map<string, string>();
+  const { data: days, error } = await db.from("orders").select("id, plan_id").in("id", orderIds).not("plan_id", "is", null);
+  if (error) {
+    console.warn("[app-orders] plan days could not be read:", error.message);
+    return codes;
+  }
+  const planIds = Array.from(new Set((days ?? []).map((d) => d.plan_id as string)));
+  if (planIds.length === 0) return codes;
+  const { data: plans, error: planError } = await db.from("delivery_plans").select("id, plan_code").in("id", planIds);
+  if (planError) {
+    console.warn("[app-orders] plan codes could not be read:", planError.message);
+    return codes;
+  }
+  const codeByPlan = new Map((plans ?? []).map((p) => [p.id as string, p.plan_code as string]));
+  for (const day of days ?? []) {
+    const code = codeByPlan.get(day.plan_id as string);
+    if (code) codes.set(day.id as string, code);
+  }
+  return codes;
 }
 
 export async function attachAppOrders<
