@@ -1,6 +1,6 @@
 import { isAppOrderCancelled, isPurgedAppDelivery } from "@/lib/deliveryStatus";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { Delivery } from "@/lib/types";
+import type { AppOrderItem, Delivery } from "@/lib/types";
 
 const APP_ORDER_SELECTS = [
   "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, confirm_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, total_amount, metadata)",
@@ -37,10 +37,11 @@ async function enrichAppOrdersWithRouteMeta(
   if (orders.length === 0) return orders;
   const ids = orders.map((order) => order.id);
 
-  const [{ data: invoices }, { data: orderRows }, planCodeByOrder] = await Promise.all([
+  const [{ data: invoices }, { data: orderRows }, planCodeByOrder, itemsByOrder] = await Promise.all([
     db.from("invoices").select("order_id, payment_status, total_amount, metadata").in("order_id", ids),
     db.from("orders").select("id, pickup_instructions, delivery_instructions").in("id", ids),
     loadPlanCodes(db, ids),
+    loadOrderItems(db, ids),
   ]);
 
   const invoiceByOrder = new Map<
@@ -67,6 +68,7 @@ async function enrichAppOrdersWithRouteMeta(
       pickup_instructions: instructions?.pickup_instructions ?? order.pickup_instructions ?? null,
       delivery_instructions: instructions?.delivery_instructions ?? order.delivery_instructions ?? null,
       plan_code: planCodeByOrder.get(order.id) ?? null,
+      items: itemsByOrder.get(order.id) ?? [],
       invoices: invoice
         ? {
             payment_status: invoice.payment_status ?? existing?.payment_status ?? null,
@@ -103,6 +105,29 @@ async function loadPlanCodes(db: ReturnType<typeof supabaseAdmin>, orderIds: str
     if (code) codes.set(day.id as string, code);
   }
   return codes;
+}
+
+/**
+ * The package details of each order. The app and the WhatsApp bot write them to
+ * `order_items`; `deliveries.content` is not filled from there.
+ */
+async function loadOrderItems(db: ReturnType<typeof supabaseAdmin>, orderIds: string[]): Promise<Map<string, AppOrderItem[]>> {
+  const items = new Map<string, AppOrderItem[]>();
+  const { data, error } = await db
+    .from("order_items")
+    .select("order_id, description, category, weight_kg, delicate_handling")
+    .in("order_id", orderIds)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    console.warn("[app-orders] package contents could not be read:", error.message);
+    return items;
+  }
+  for (const { order_id, ...item } of data ?? []) {
+    const list = items.get(order_id as string);
+    if (list) list.push(item);
+    else items.set(order_id as string, [item]);
+  }
+  return items;
 }
 
 export async function attachAppOrders<
