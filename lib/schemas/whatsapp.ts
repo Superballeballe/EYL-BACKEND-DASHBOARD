@@ -168,3 +168,25 @@ export const whatsappEventsQuerySchema = z.object({
     .transform((v) => v.replace(/^0+(?=\d)/, "")),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
+
+// ---- wallet ---------------------------------------------------------------------
+
+const paiseSchema = z.number().int().positive().max(10_000_000);
+const walletRefSchema = z.string().trim().min(1).max(200);
+
+export const whatsappWalletQuerySchema = z.object({ wa_id: waIdSchema });
+
+/** A top-up, in whole rupees as the customer says it ("top up 1000"). */
+export const whatsappWalletTopupSchema = z.object({
+  wa_id: waIdSchema,
+  amount_rupees: z.number().int().positive().max(100_000),
+  name: z.string().trim().max(120).optional(),
+});
+
+export const whatsappWalletMovementSchema = z.object({
+  wa_id: waIdSchema,
+  amount_paise: paiseSchema,
+  /** Identifies the purchase; the same ref never debits (or refunds) twice. */
+  ref: walletRefSchema,
+  note: z.string().trim().max(300).optional(),
+});
