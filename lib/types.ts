@@ -228,6 +228,8 @@ export type Delivery = {
     delivery_instructions?: string | null;
     /** The delivery plan this order is a day of (PLN-0042), or null for a single booking. */
     plan_code?: string | null;
+    /** What the customer said is in the package (`order_items`). */
+    items?: AppOrderItem[];
     invoices?:
       | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }
       | { payment_status?: string | null; total_amount?: number | null; metadata?: Record<string, unknown> | null }[]
@@ -235,6 +237,14 @@ export type Delivery = {
   } | null;
   created_at: string;
   updated_at: string;
+};
+
+/** One `order_items` row of an app or WhatsApp order. */
+export type AppOrderItem = {
+  description?: string | null;
+  category?: string | null;
+  weight_kg?: number | string | null;
+  delicate_handling?: boolean | null;
 };
 
 /**

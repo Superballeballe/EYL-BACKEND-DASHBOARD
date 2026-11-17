@@ -35,6 +35,7 @@ import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
 import { formatDeliveryOrderId, formatDeliverySource } from "@/lib/serial";
 import { deliverySchedule } from "@/lib/deliverySchedule";
+import { packageContents } from "@/lib/packageContents";
 import { effectiveFulfillmentStatus, lifecycleStage } from "@/lib/deliveryStatus";
 import type { Delivery } from "@/lib/types";
 
@@ -174,7 +175,7 @@ export default function DeliveryTable({
                     title={recipients || undefined}
                     sx={{ color: "text.secondary", display: "block" }}
                   >
-                    {recipients ? `→ ${recipients}` : delivery.content ?? ""}
+                    {recipients ? `→ ${recipients}` : packageContents(delivery) ?? ""}
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -531,6 +532,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
   const pickupContact = getPickupContact(delivery);
   const instructions = getDeliveryInstructions(delivery);
   const schedule = deliverySchedule(delivery);
+  const contents = packageContents(delivery);
 
   return (
     <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.75fr)]">
@@ -582,7 +584,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
           <DetailRow label="Mode" value={formatBookingMode(delivery.mode_of_booking)} />
           <DetailRow label="Invoice no." value={delivery.invoice_no} />
           <DetailRow label="Billed to" value={delivery.billing_name} />
-          {delivery.content ? <DetailRow label="Content" value={delivery.content} /> : null}
+          {contents ? <DetailRow label="Content" value={contents} /> : null}
           {delivery.remark ? <DetailRow label="Remark" value={delivery.remark} /> : null}
           {instructions.multiDrop ? <DetailRow label="Multidrop notes" value={instructions.multiDrop} /> : null}
         </dl>
