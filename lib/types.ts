@@ -215,6 +215,8 @@ export type Delivery = {
     order_code: string | null;
     status: "registered" | "accepted" | "rider_assigned" | "picked_up" | "delivered" | "cancelled" | string | null;
     rider_name?: string | null;
+    /** When the customer placed the order. */
+    created_at?: string | null;
     scheduled_for?: string | null;
     pickup_scheduled_at?: string | null;
     delivery_scheduled_at?: string | null;

@@ -31,6 +31,8 @@ import { cancelledRefundPaise, formatPaise, refundStatusInfo } from "@/lib/refun
 import BusinessOverview, { type ChartBundle } from "@/components/BusinessOverview";
 import { fmtDatetimeLocal, money } from "@/lib/format";
 import { getDeliveryStops } from "@/lib/deliveryRouteDetails";
+import { bookedAt, deliverySchedule } from "@/lib/deliverySchedule";
+import { packageContents } from "@/lib/packageContents";
 import { formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { activateOnKey } from "@/lib/keyboard";
 import { formatDeliveryOrderId } from "@/lib/serial";
@@ -90,6 +92,18 @@ function JobCard({
     { name: d.sender_name, location: d.pickup_location },
     getDeliveryStops(d),
   );
+  const schedule = deliverySchedule(d);
+  // An app slot is one window for the whole job, so show it once.
+  // The drop time is ops' to set, so say when it still is missing.
+  const scheduleLine =
+    schedule.pickup && schedule.pickup === schedule.drop
+      ? `Slot · ${schedule.pickup}`
+      : schedule.pickup || schedule.drop
+        ? [schedule.pickup ? `Pickup ${schedule.pickup}` : null, schedule.drop ? `Drop ${schedule.drop}` : "Drop not set"]
+            .filter(Boolean)
+            .join(" → ")
+        : null;
+  const contents = packageContents(d);
 
   return (
     <Box
@@ -131,13 +145,22 @@ function JobCard({
         {routePeople}
       </Typography>
       <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
-        {formatDeliveryOrderId(d)}
+        {formatDeliveryOrderId(d)} · Booked {fmtDatetimeLocal(bookedAt(d))}
       </Typography>
       <DeliveryTaskBadges delivery={d} />
+      {scheduleLine ? (
+        <Typography variant="caption" noWrap title={scheduleLine} sx={{ display: "block", mt: 0.25 }}>
+          {scheduleLine}
+        </Typography>
+      ) : null}
+      {contents ? (
+        <Typography variant="caption" noWrap title={contents} sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+          Content · {contents}
+        </Typography>
+      ) : null}
       {mode === "running" ? (
         <Typography variant="caption" noWrap sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
           Knight · {d.knight_name?.trim() || "Unassigned"}
-          {d.pickup_time_window ? ` · Pickup ${fmtDatetimeLocal(d.pickup_time_window)}` : ""}
         </Typography>
       ) : null}
 

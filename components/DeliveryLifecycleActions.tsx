@@ -93,7 +93,8 @@ const statusRank: Record<string, number> = {
   canceled: -1,
 };
 
-function defaultScheduleTimes() {
+/** The pickup to suggest when none is recorded. There is no suggested drop: ops set it. */
+function defaultPickupTime() {
   const pickup = new Date();
   pickup.setSeconds(0, 0);
   pickup.setMinutes(Math.ceil(pickup.getMinutes() / 15) * 15);
@@ -108,16 +109,7 @@ function defaultScheduleTimes() {
     pickup.setHours(8, 0, 0, 0);
   }
 
-  const drop = new Date(pickup);
-  drop.setMinutes(drop.getMinutes() + 60);
-  if (drop.getHours() * 60 + drop.getMinutes() > endMins) {
-    drop.setHours(20, 30, 0, 0);
-  }
-
-  return {
-    pickup: toDatetimeLocalValue(pickup.toISOString()),
-    drop: toDatetimeLocalValue(drop.toISOString()),
-  };
+  return toDatetimeLocalValue(pickup.toISOString());
 }
 
 function resolveScheduleInput(
@@ -137,12 +129,9 @@ function appPickupSchedule(order?: AppOrderSummary | null) {
   return order?.pickup_scheduled_at ?? order?.scheduled_for ?? null;
 }
 
+/** The drop time ops set, if any. The customer books only a pickup slot, so nothing is estimated. */
 function appDeliverySchedule(order?: AppOrderSummary | null) {
-  if (order?.delivery_scheduled_at) return order.delivery_scheduled_at;
-  if (!order?.scheduled_for) return null;
-  const drop = new Date(order.scheduled_for);
-  drop.setMinutes(drop.getMinutes() + 90);
-  return drop.toISOString();
+  return order?.delivery_scheduled_at ?? null;
 }
 
 function appInvoice(order?: AppOrderSummary | null): AppInvoiceSummary | null {
@@ -322,14 +311,13 @@ export default function DeliveryLifecycleActions({
     setSelectedKnightId(delivery.knight_id ?? "");
     setCustomKnightName(delivery.knight_id ? "" : (delivery.knight_name ?? ""));
 
-    const defaults = defaultScheduleTimes();
     const taskDate = delivery.task_date ?? null;
     setPickupAt(
       resolveScheduleInput(
         appPickupSchedule(delivery.app_order),
         delivery.pickup_time_window,
         taskDate,
-        defaults.pickup,
+        defaultPickupTime(),
       ),
     );
     setDeliveryAt(
@@ -337,7 +325,7 @@ export default function DeliveryLifecycleActions({
         appDeliverySchedule(delivery.app_order),
         delivery.drop_time_window,
         taskDate,
-        defaults.drop,
+        "",
       ),
     );
     setAssignOpen(true);
@@ -616,7 +604,7 @@ export default function DeliveryLifecycleActions({
               value={deliveryAt}
               min={pickupAt || minPickupAt}
               onChange={setDeliveryAt}
-              helperText="Expected drop-off time"
+              helperText="Set by ops: the customer only books a 30-minute pickup slot"
             />
           </Stack>
         </DialogContent>
