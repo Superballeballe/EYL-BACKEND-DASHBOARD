@@ -34,7 +34,7 @@ import { formatRecipients, formatRoutePeople } from "@/lib/deliveryTaskBadges";
 import { DIALOG_RADIUS, shadow, tableShellSx } from "@/lib/surface";
 import { areaLabel, fmtDate, fmtDatetimeLocal, fmtShortDate, formatBookingMode, money } from "@/lib/format";
 import { formatDeliveryOrderId, formatDeliverySource } from "@/lib/serial";
-import { deliverySchedule } from "@/lib/deliverySchedule";
+import { bookedAt, deliverySchedule } from "@/lib/deliverySchedule";
 import { packageContents } from "@/lib/packageContents";
 import { effectiveFulfillmentStatus, lifecycleStage } from "@/lib/deliveryStatus";
 import type { Delivery } from "@/lib/types";
@@ -573,6 +573,7 @@ function DeliveryPreview({ delivery }: { delivery: Delivery }) {
         <dl>
           <DetailRow label="Order ID" value={orderId} />
           <DetailRow label="Source" value={source} />
+          <DetailRow label="Booked" value={fmtDatetimeLocal(bookedAt(delivery))} />
           <DetailRow label="Sender" value={delivery.sender_name} />
           <DetailRow label="Knight" value={delivery.knight_name?.trim() || "Unassigned"} />
           <DetailRow label="Fees" value={money(delivery.fees)} />

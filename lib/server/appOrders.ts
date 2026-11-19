@@ -3,11 +3,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AppOrderItem, Delivery } from "@/lib/types";
 
 const APP_ORDER_SELECTS = [
-  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, confirm_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, total_amount, metadata)",
-  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, metadata)",
-  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at",
-  "id, order_code, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
-  "id, order_code, status, scheduled_for, pickup_scheduled_at, delivery_scheduled_at",
+  "id, order_code, created_at, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, confirm_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, total_amount, metadata)",
+  "id, order_code, created_at, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at, pickup_instructions, delivery_instructions, invoices(payment_status, metadata)",
+  "id, order_code, created_at, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at, confirmed_at, pending_knight_id, payment_deadline_at",
+  "id, order_code, created_at, status, rider_name, scheduled_for, pickup_scheduled_at, delivery_scheduled_at, accepted_at, rider_assigned_at",
+  "id, order_code, created_at, status, scheduled_for, pickup_scheduled_at, delivery_scheduled_at",
   "id, order_code, status",
   "id, order_code",
 ];
